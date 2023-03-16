@@ -347,6 +347,8 @@ print(knitr::include_graphics(paste0("~/OneDrive - Charité - Universitätsmed
 library(readr)
 data_stringtie <- read_csv("transcript_count_matrix.csv")
 
+
+
 stringtie_iso_1 <- filter(data_stringtie, transcript_id == "ENST00000450525.7")%>%
   select(-transcript_id)
 
@@ -371,28 +373,38 @@ stringtie_iso_2 <- mutate(stringtie_iso_2, "Sample"=rownames(stringtie_iso_2), "
 data_stringtie_filtered <- inner_join(stringtie_iso_1, stringtie_iso_2) %>%
   mutate("Package" = as.factor("stringtie"))%>%
   relocate(Package, .after=Sample)
+```
+
+```{r}
+## Normalize to sequencing depth
+## Lets normalize by the M of uniquely aligned reads
+data_stringtie_filtered_normalized <- inner_join(data_stringtie_filtered, depth, by ="Sample")
+
+data_stringtie_filtered_normalized <- data_stringtie_filtered_normalized %>% 
+  mutate(across(where(is.numeric), ~ .x/`M Aligned`)) # value/M of reads
+
+### let's fill in with the metadata
+data_stringtie_filtered_normalized <- inner_join(data_stringtie_filtered_normalized, metadata, by ="Sample") %>%
+  select(-`M Aligned`, -`% Aligned`) %>%
+  unique() # remove duplicates coming from paired reads
+```
 
 
+```{r}
 ##Add calculations as for the other methods
 
-data_stringtie_filtered <- data_stringtie_filtered%>%
+data_stringtie_filtered_normalized <- data_stringtie_filtered_normalized%>%
   mutate("THRA1_Percentage" = round(THRA1/(THRA1+THRA2)*100)) %>%
   mutate("THRA2_Percentage" = round(100-THRA1_Percentage)) %>%
   mutate("THRA1_higher" = THRA1 > THRA2) %>%
   mutate("delta_percentage" = THRA1_Percentage - THRA2_Percentage)
 
-data_stringtie_filtered
+data_stringtie_filtered_normalized
   
 ```
-```{r}
-data_stringtie_filtered <- inner_join(data_stringtie_filtered, metadata, by ="Sample") %>%
-  unique()
-
-data_stringtie_filtered
-```
 
 ```{r}
-total_plot <-  select(data_stringtie_filtered, Sample, study_day,  THRA1, THRA2)
+total_plot <-  select(data_stringtie_filtered_normalized, Sample, study_day,  THRA1, THRA2)
 
 total_plot <- total_plot[order(total_plot$THRA2), ]  # sort
 total_plot$Sample <- factor(total_plot$Sample, levels = total_plot$Sample)  # convert to factor to retain sorted order in plot.
