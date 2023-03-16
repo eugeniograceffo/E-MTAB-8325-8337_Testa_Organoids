@@ -1,0 +1,426 @@
+---
+title: "THRA Isoform 1 and Isoform 2 Relative Expression"
+output:
+  html_document:
+    toc: True
+    toc_float: True
+    df_print: paged
+editor_options: 
+  chunk_output_type: inline
+---
+
+INTRODUCTION to the Experiment
+Dataset from Testa et al 2020 (E-MTAB-8325 https://www.ebi.ac.uk/biostudies/arrayexpress/studies/E-MTAB-8325?query=e-MTAB-8325)
+A total of 9 samples of human cortical organoids (3 timepoints, 3 replicates each). Bulk RNA seq data. First-Stranded pair-end reads. Read counts of exon 9a (Chr17:40089333) and exon 9b (Chr17:40089334)
+
+```{r}
+#load libraries
+library(tidyverse)
+library(readr)
+library(ggplot2)
+library(plotly)
+library(matrixStats)
+library(ggrepel)
+library(scales)
+library(readxl)
+library(dplyr)
+library(ggpubr)
+
+```
+
+
+```{r}
+## set paths for output figure
+path_plots <- "~/OneDrive - Charité - Universitätsmedizin Berlin/Schuelke_Lab/EG15_RNA_Seq/E-MTAB-8325_Testa_Organoids_Bulk/Expression_pattern_output"
+
+## load metadata file
+
+metadata <- read_excel("Metadata_Testa_Organoids_Bulk_E_MTAB_8325.xls")
+
+## load metadata file of EBI
+
+metadata_ebi <- read_delim("filereport_read_run_PRJEB38729_tsv.txt")
+
+
+## load sequencing depth for normalization
+
+depth <- read_delim("Sequencing_depth.txt")
+
+##Load mosdepth outputs
+
+file_links_mosdepth <- list.files(path= "~/OneDrive - Charité - Universitätsmedizin Berlin/Schuelke_Lab/EG15_RNA_Seq/E-MTAB-8325_Testa_Organoids_Bulk/mosdepth_outputs" , pattern = "*.bed", full.names=T)
+
+
+# initialize an empty dataframe
+data_mosdepth <- data_frame("V1"=character(),
+                   "V2"=integer(),
+                   "V3"=integer(),
+                   "V4"=character(),
+                   "V5"=double(),
+                   "Sample"=character()) 
+
+for (x in file_links_mosdepth) {
+  table_sample <- read.delim(x, header = FALSE) ## read table
+  basename_sample <- str_remove(basename(x), "_Aligned.out.regions.bed")  ## get the sample name from the file path
+  table_sample <- mutate(table_sample, "Sample"=basename_sample)
+  data_mosdepth <- bind_rows(data_mosdepth, table_sample)
+  
+}
+
+data_mosdepth
+
+```
+
+```{r}
+### let's prepare the metadata file
+
+metadata_ebi <- select(metadata_ebi, "Sample"="run_accession", "ENA_EXPERIMENT"= "experiment_accession")
+
+metadata <- inner_join(metadata, metadata_ebi, by = "ENA_EXPERIMENT") %>%
+  select(Sample, disease, sex, individual, "study_day" =time, compound)
+
+```
+
+
+```{r}
+## Let's rearrange the data in a useful way
+dataset <- data_mosdepth %>%
+  select(Sample, Isoform = V4, Reads_count =V5) %>%
+  spread(key="Isoform", value="Reads_count") 
+
+#dataset$Sample<-gsub("_1.fq.gz","",as.character(dataset$Sample)) ## remove the last part of the string on the sample names
+
+## Lets normalize by the M of uniquely aligned reads
+dataset_normalized <- inner_join(dataset, depth, by ="Sample")
+
+dataset_normalized <- dataset_normalized %>% 
+  mutate(across(where(is.numeric), ~ .x/`M Aligned`)) # value/M of reads
+
+### let's fill in with the metadata
+dataset_normalized <- inner_join(dataset_normalized, metadata, by ="Sample") %>%
+  select(-`M Aligned`, -`% Aligned`) %>%
+  inner_join(depth, by ="Sample") %>%
+  unique() # remove duplicates coming from paired reads
+
+
+
+### rearrangement and factorization of columns
+dataset_normalized$Treatment <- as.factor(dataset_normalized$Treatment)
+dataset_normalized$study_day <- as.factor(dataset_normalized$study_day)
+dataset_normalized <- rename(dataset_normalized, "hiPSC_line" = "hiPSC_line\r\nline")
+
+
+dataset_normalized
+```
+
+
+
+```{r}
+## Let's calkculate THRA1 (counts of 9b) and THRA2 (9a-9b)
+
+dataset_normalized <- dataset_normalized %>%
+  mutate("THRA1"= dataset_normalized$`9b`) %>%
+  mutate("THRA2"=dataset_normalized$`9a`-dataset_normalized$`9b`) %>%
+  rename("Read_counts_9a" = "9a") %>%
+  rename("Read_counts_9b" = "9b") 
+
+dataset_normalized
+
+```
+```{r}
+## Let's add the final calculations
+
+dataset_normalized_final <- dataset_normalized %>%
+  mutate("delta_A1vsA2" = THRA1 - THRA2) %>%
+  mutate("THRA1_Percentage" = round(THRA1/Read_counts_9a*100)) %>%
+  mutate("THRA2_Percentage" = round(100-THRA1_Percentage)) %>%
+  mutate("THRA1_higher" = THRA1 > THRA2) %>%
+  mutate("delta_percentage" = THRA1_Percentage - THRA2_Percentage)
+
+dataset_normalized_final
+  
+```
+
+
+
+```{r}
+# Barchart showing Expression of A1 and A2 over time in only control samples
+total_plot <-  select(dataset_normalized_final, Sample, study_day,  THRA1, THRA2)
+
+total_plot <- total_plot[order(total_plot$THRA2), ]  # sort
+total_plot$Sample <- factor(total_plot$Sample, levels = total_plot$Sample)  # convert to factor to retain sorted order in plot.
+
+total_plot <- pivot_longer(total_plot, c("THRA1","THRA2"), names_to = "Isoform", values_to = "Expression")
+  
+
+
+ggplot(total_plot, aes(x=study_day, y=Expression, label=Isoform)) + 
+  geom_bar(stat='summary', position = "stack", aes(fill=Isoform), width=.5)  +
+   theme_light(base_size = 14)+
+  scale_y_continuous("Read Counts per Million (RPM)") +
+  scale_fill_manual(name="Isoform", 
+                    labels = c( "THRA1", "THRA2"), 
+                    values = c("THRA1"="#A2D2DB", "THRA2"="#5A7C86")) + 
+  labs(subtitle="Read counts calculated with Mosdepth", 
+       title= "THRA isoform expression pattern",
+       caption = "~78M uniquely mapped reads, n>=2")
+
+
+
+
+ggsave("THRA1_THRA2_mosdepth_over_time_control.png" , device=png, dpi = 600, path = path_plots, bg = "transparent", width = 20, height = 15, units = "cm" )
+
+
+ggbarplot(total_plot, x = "study_day", y = "Expression", add = "mean_se",
+          fill = "Isoform") +
+  scale_fill_manual("", values = c("THRA1"="#A2D2DB","THRA2" = "#5A7C86")) +
+  labs(subtitle="Human cortical organoids", 
+       title= paste0("THRA isoform expression pattern"),
+       caption = "~78M uniquely mapped reads / Mean +- SEM, n>=2") +
+  theme(legend.position='right')+
+  theme_light(base_size = 14)+
+  scale_y_continuous("Read Counts per Million (RPM)")
+
+ggsave("THRA1_THRA2_mosdepth_over_time_organoids_stacked_with_error_bars.png" , device=png, dpi = 600, path = path_plots, bg = "transparent", width = 20, height = 15, units = "cm" )
+```
+```{r}
+# Barchart with mean and se
+total_plot <- filter(dataset_normalized_final, Treatment == "control") %>%
+  select(Sample,study_day,  THRA1=THRA1_Percentage, THRA2= THRA2_Percentage)
+
+total_plot <- total_plot[order(total_plot$THRA2), ]  # sort
+total_plot$Sample <- factor(total_plot$Sample, levels = total_plot$Sample)  # convert to factor to retain sorted order in plot.
+
+total_plot <- pivot_longer(total_plot, c("THRA1","THRA2"), names_to = "Isoform", values_to = "Expression")
+  
+
+ggbarplot(total_plot, x = "study_day", y = "Expression", add = "mean_se",
+          fill = "Isoform") +
+  scale_fill_manual("", values = c("THRA1"="#A2D2DB","THRA2" = "#5A7C86")) +
+  labs(subtitle="In-house human cortical organoids", 
+       title= paste0("THRA isoform expression pattern"),
+       caption = "Mean +- SEM, n>=2") +
+  scale_y_continuous("Isoform precentage (%)", breaks = c(0, 25, 50, 75, 100)) +
+  geom_hline(yintercept=50, linetype="dashed", color = "red")+
+  theme(legend.position='right')+
+  theme_light(base_size = 14)
+
+
+ggsave("THRA1_THRA2_mosdepth_over_time_control_percentages.png" , device=png, dpi = 600, path = path_plots, bg = "transparent", width = 20, height = 15, units = "cm" )
+```
+```{r}
+# Barchart showing Expression of A1 and A2 over time 
+total_plot <- filter(dataset_normalized_final, Organism=="Homo sapiens") %>%
+  select(Sample,Time_point, THRA1, THRA2)
+
+total_plot <- total_plot[order(total_plot$THRA2), ]  # sort
+total_plot$Sample <- factor(total_plot$Sample, levels = total_plot$Sample)  # convert to factor to retain sorted order in plot.
+total_plot$Time_point <- as.factor(total_plot$Time_point)
+
+total_plot <- pivot_longer(total_plot, c("THRA1","THRA2"), names_to = "Isoform", values_to = "Expression")
+  
+
+
+ggplot(total_plot, aes(x=Time_point, y=Expression, label=Isoform)) + 
+  geom_bar(stat='summary', position = "stack", aes(fill=Isoform), width=.5)  +
+   theme_light(base_size = 14)+
+  scale_y_continuous("Read Counts per Million (RPM)", limits= c(0, 4)) +
+  scale_fill_manual(labels = c( "THRA1", "THRA2"), 
+                    values = c("THRA1"="#A2D2DB", "THRA2"="#5A7C86")) + 
+  labs(subtitle="Homo Sapiens", 
+       title= "THRA isoform expression pattern",
+       caption = "~20M uniquely mapped reads, n=3")
+
+ggsave("THRA1_THRA2_mosdepth_over_time_Homo_sapiens_stacked_no_error_bars.png" , device=png, dpi = 600, path = path_plots, bg = "transparent", width = 20, height = 15, units = "cm" )
+
+
+ggbarplot(total_plot, x = "Time_point", y = "Expression", add = "mean_se",
+          fill = "Isoform") +
+  scale_fill_manual("", values = c("THRA1"="#A2D2DB","THRA2" = "#5A7C86")) +
+  labs(subtitle="Homo Sapiens", 
+       title= paste0("THRA isoform expression pattern"),
+       caption = "~20M uniquely mapped reads / Mean +- SEM, n=3") +
+  theme(legend.position='right')+
+  theme_light(base_size = 14)+
+  scale_y_continuous("Read Counts per Million (RPM)", limits= c(0, 4))
+
+ggsave("THRA1_THRA2_mosdepth_over_time_Homo_sapiens_stacked_with_error_bars.png" , device=png, dpi = 600, path = path_plots, bg = "transparent", width = 20, height = 15, units = "cm" )
+```
+
+
+```{r}
+#### Plot of Control vs T3 pulse over time - THRA
+graph_data <- select(dataset_normalized_final, Sample,study_day,Treatment,  THRA1, THRA2, THRA, hiPSC_line)
+
+## Let´s calculate the group summaries
+
+
+dataset_normalized_stats <- graph_data %>%
+  group_by(study_day, Treatment) %>%
+  mutate(THRA_mean = mean(THRA)) %>%
+  mutate(THRA_SD = sd(THRA)) %>%
+  mutate(THRA1_mean = mean(THRA1)) %>%
+  mutate(THRA1_SD = sd(THRA1)) %>%
+  mutate(THRA2_mean = mean(THRA2)) %>%
+  mutate(THRA2_SD = sd(THRA2)) %>%
+  select(-Sample, -hiPSC_line, -THRA, -THRA1, -THRA2)
+
+dataset_normalized_stats
+
+
+
+compare_means(THRA ~ Treatment, data = graph_data, 
+              group.by = "study_day")
+
+compare_means(THRA2 ~ Treatment,  data = graph_data, method = "anova")
+
+
+
+
+ggbarplot(graph_data, x = "study_day", y = "THRA", add = "mean_se",
+          fill = "Treatment",
+          position = position_dodge(0.8)) +
+  scale_fill_manual("", values = c("control" = "#31092D", "T3_pulse"="#E98A33")) +
+  stat_compare_means(aes(group = Treatment), label = "p.signif", label.y = c(1.2, 3.1, 3.6)) +
+  labs(subtitle="Read counts/gene length in bp/ Millions of reads", 
+       title= "THRA expression of Cntrl vs T3 treatment over time",
+       caption = "Wilcoxon test, n>=2\n ~78M uniquely mapped reads") +
+       scale_y_continuous("Transcripts per Million (pseudo TPM)") +
+  theme(legend.position='right')+
+  theme_light(base_size = 14)
+
+## save plot
+ggsave("Treatment_barchart_over_time_THRA.png" , device=png, dpi = 600, path = path_plots, bg = "transparent", width = 20, height = 15, units = "cm" )
+```
+
+
+```{r}
+### Plot of Control vs T3 pulse over time - THRA1
+
+ggbarplot(graph_data, x = "study_day", y = "THRA1", add = "mean_se",
+          fill = "Treatment",
+          position = position_dodge(0.8)) +
+  scale_fill_manual("", values = c("control" = "#31092D", "T3_pulse"="#E98A33")) +
+  stat_compare_means(aes(group = Treatment), label = "p.signif", label.y = c(3.5, 10.5, 10.5)) +
+  labs(subtitle="Read counts per Millions", 
+       title= "THRA1 expression of Cntrl vs T3 treatment over time",
+       caption = "Wilcoxon test, n>=2\n ~78M uniquely mapped reads") +
+  scale_y_continuous("Read Counts per Millions (RPM)") +
+  theme(legend.position='right')+
+  theme_light(base_size = 14)
+
+
+
+## save plot
+ggsave("Treatment_barchart_over_time_THRA1.png" , device=png, dpi = 600, path = path_plots, bg = "transparent", width = 20, height = 15, units = "cm" )
+```
+
+
+```{r}
+### Plot of Control vs T3 pulse over time - THRA2
+
+ggbarplot(graph_data, x = "study_day", y = "THRA2", add = "mean_se",
+          fill = "Treatment",
+          position = position_dodge(0.8)) +
+  scale_fill_manual("", values = c("control" = "#31092D", "T3_pulse"="#E98A33")) +
+  stat_compare_means(aes(group = Treatment), label = "p.signif", label.y = c(10.2, 20.2, 25.6)) +
+  labs(subtitle="Read counts per Millions", 
+       title= "THRA2 expression of Cntrl vs T3 treatment over time",
+       caption = "Wilcoxon test, n>=2\n ~78M uniquely mapped reads") +
+  scale_y_continuous("Read Counts per Millions (RPM)") +
+  theme(legend.position='right')+
+  theme_light(base_size = 14)
+
+
+
+## save plot
+ggsave("Treatment_barchart_over_time_THRA2.png" , device=png, dpi = 600, path = path_plots, bg = "transparent", width = 20, height = 15, units = "cm" )
+```
+
+
+```{r}
+### Barplot each gene expression in a different graph
+gene_list <- colnames(dataset_normalized_final[,(4:18)]) #get a list of gene names from dataset
+
+for (gene in gene_list ) {
+  
+  ggline(dataset_normalized_final, x = "study_day", y = gene, add = "mean_se",
+          color = "Treatment") +
+  scale_color_manual("", values = c("control"="#5A7C86","T3_pulse" = "#E98A33")) +
+  stat_compare_means(aes(group = Treatment), label = "p.signif", method = "t.test") +
+  labs(subtitle="Read counts/gene length in bp/ Millions of uniquely mapped reads", 
+       title= paste0(gene, " expression"),
+       caption = "t-test within time points, n=3\n ~78M uniquely mapped reads") +
+  scale_y_continuous("Transcripts per Million (pseudo TPM)") +
+  theme(legend.position='right')+
+  theme_light(base_size = 14)
+
+  
+  graph_title <- paste0("Barplot_", gene, ".png")
+  
+  ggsave(graph_title, device=png, width = 20, height = 15, units = "cm", bg = "transparent", dpi = 600, path= "/Users/eugeniograceffo/OneDrive - Charité - Universitätsmedizin Berlin/Schuelke_Lab/EG15_RNA_Seq/Brain_organoids/Figures/Control_vs_treatment")
+  
+print(knitr::include_graphics(paste0("/Users/eugeniograceffo/OneDrive - Charité - Universitätsmedizin Berlin/Schuelke_Lab/EG15_RNA_Seq/Brain_organoids/Figures/Control_vs_treatment/",graph_title)))
+  
+}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+### Calulations with the STRINGTIE ouput
+
+library(readr)
+data_stringtie <- read_csv("transcript_count_matrix.csv")
+
+stringtie_iso_1 <- filter(data_stringtie, transcript_id == "ENST00000450525.7")%>%
+  select(-transcript_id)
+
+stringtie_iso_1
+
+stringtie_iso_1 <- as.data.frame(t(stringtie_iso_1)) 
+stringtie_iso_1 <- mutate(stringtie_iso_1, "Sample"=rownames(stringtie_iso_1), "THRA1" = V1) %>%
+  select(-V1)
+
+stringtie_iso_1
+
+
+
+stringtie_iso_2 <- filter(data_stringtie, transcript_id == "ENST00000264637.8")%>%
+  select(-transcript_id)
+
+stringtie_iso_2 <- as.data.frame(t(stringtie_iso_2)) ## to transpose the dataframe
+stringtie_iso_2 <- mutate(stringtie_iso_2, "Sample"=rownames(stringtie_iso_2), "THRA2" = V1) %>%
+  select(-V1)
+
+
+data_stringtie_filtered <- inner_join(stringtie_iso_1, stringtie_iso_2) %>%
+  mutate("Package" = as.factor("stringtie"))%>%
+  relocate(Package, .after=Sample)
+
+
+##Add calculations as for the other methods
+
+data_stringtie_filtered <- data_stringtie_filtered%>%
+  mutate("THRA1_Percentage" = round(THRA1/(THRA1+THRA2)*100)) %>%
+  mutate("THRA2_Percentage" = round(100-THRA1_Percentage)) %>%
+  mutate("THRA1_higher" = THRA1 > THRA2) %>%
+  mutate("delta_percentage" = THRA1_Percentage - THRA2_Percentage)
+
+data_stringtie_filtered
+  
+```
+
+
