@@ -7,3 +7,4 @@
 THRA_counts.xlsx
 Bulk_analysis/gene_count_matrix.csv
 Bulk_analysis/transcript_count_matrix.csv
+.DS_Store
