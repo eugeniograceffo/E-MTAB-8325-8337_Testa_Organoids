@@ -1,5 +1,5 @@
 ---
-title: "scRNA-Seq Analysis of Cortical Brain Organoids"
+title: "scRNA-Seq Analysis of Brain Organoid dataset from Testa et al 2020"
 output: html_notebook
 ---
 ## Intro
@@ -24,14 +24,14 @@ library(sctransform)
 
 ```{r}
 ## Load dataset
-mat <- Read10X("~/OneDrive - Charité - Universitätsmedizin Berlin/Schuelke_Lab/EG15_RNA_Seq/Brain_organoids_scRNA_Seq/cell_ranger_files")
+mat_S20276_177 <- Read10X("/home/data/Testa_organoids_scRNA/S20276_177/outs/filtered_feature_bc_matrix")
 
-dimnames(mat)
+dimnames(mat_S20276_177)
 ```
 
 ```{r}
 ## Create Seurat object
-srat <- CreateSeuratObject(counts = mat, project = "organoids") 
+srat <- CreateSeuratObject(counts = mat_S20276_177, project = "S20276_177") 
 
 #srat <- readRDS(file = "~/OneDrive - Charité - Universitätsmedizin Berlin/Schuelke_Lab/EG15_RNA_Seq/Brain_organoids_scRNA_Seq/outputs/cortical_organoids_results.rds") # reload if saved
 srat
