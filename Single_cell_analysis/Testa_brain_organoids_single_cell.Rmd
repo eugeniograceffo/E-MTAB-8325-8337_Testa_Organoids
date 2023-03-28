@@ -1,0 +1,368 @@
+---
+title: "scRNA-Seq Analysis of Cortical Brain Organoids"
+output: html_notebook
+---
+## Intro
+
+```{r}
+## Load libraries
+library(Seurat)
+library(ggplot2)
+library(SingleR)
+library(dplyr)
+library(patchwork)
+#library(celldex)
+library(RColorBrewer)
+library(SingleCellExperiment)
+#library(DropletUtils)
+#library(usethis)
+library(tidyverse)
+library(sctransform)
+#library(Matrix.utils)
+```
+
+```{r}
+## Load dataset
+mat <- Read10X("~/OneDrive - Charité - Universitätsmedizin Berlin/Schuelke_Lab/EG15_RNA_Seq/Brain_organoids_scRNA_Seq/cell_ranger_files")
+
+dimnames(mat)
+```
+
+```{r}
+## Create Seurat object
+srat <- CreateSeuratObject(counts = mat, project = "organoids") 
+
+#srat <- readRDS(file = "~/OneDrive - Charité - Universitätsmedizin Berlin/Schuelke_Lab/EG15_RNA_Seq/Brain_organoids_scRNA_Seq/outputs/cortical_organoids_results.rds") # reload if saved
+srat
+```
+
+```{r}
+## Have a look
+mat <- NULL # saves RAM
+str(srat)
+
+meta <- srat@meta.data
+dim(meta)
+head(meta)
+
+```
+
+
+## Quality Control
+```{r}
+## Let's do some QC
+#mitochondrial contamination
+srat[["percent.mt"]] <- PercentageFeatureSet(srat, pattern = "^MT-")
+
+# ribosomial protein (RPS or RPL)
+srat[["percent.rb"]] <- PercentageFeatureSet(srat, pattern = "^RP[SL]")
+
+head(srat@meta.data, 5)
+```
+```{r}
+# Visualize QC metrics as a violin plot
+VlnPlot(srat, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.rb"), ncol = 4)
+
+## looking at data, I would set 500<nFeature<9000 , perc.mt<12
+```
+```{r}
+# FeatureScatter is typically used to visualize feature-feature relationships, but can be used
+# for anything calculated by the object, i.e. columns in object metadata, PC scores etc.
+
+## Let's have a look at some correlations
+
+FeatureScatter(srat, feature1 = "nCount_RNA", feature2 = "percent.mt") + geom_hline(yintercept=12, linetype="dashed", color = "blue")
+FeatureScatter(srat, feature1 = "nCount_RNA", feature2 = "nFeature_RNA") + geom_hline(yintercept=9000, linetype="dashed", color = "blue") + geom_hline(yintercept=500, linetype="dashed", color = "blue")
+FeatureScatter(srat, feature1 = "nCount_RNA", feature2 = "percent.rb")
+
+# as expected, higher mt % correlates with low counts ie dead cells
+```
+
+```{r}
+## apply filters
+srat <- subset(srat, subset = nFeature_RNA > 500 & nFeature_RNA < 9000 & percent.mt < 12)
+```
+
+## Normalization 
+
+After removing unwanted cells from the dataset, the next step is to normalize the data. By default, we employ a global-scaling normalization method “LogNormalize” that normalizes the feature expression measurements for each cell by the total expression, multiplies this by a scale factor (10,000 by default), and log-transforms the result. Normalized values are stored in pbmc[["RNA"]]@data.
+
+```{r}
+## Let's normalize
+srat <- NormalizeData(srat, normalization.method = "LogNormalize", scale.factor = 10000)
+```
+
+## Feature Selection
+
+```{r}
+##Let's find the most variable features(genes) to use downstream
+srat <- FindVariableFeatures(srat, selection.method = "vst", nfeatures = 2000)
+
+# Identify the 10 most highly variable genes
+top10 <- head(VariableFeatures(srat), 10)
+top10
+
+# plot variable features with and without labels
+plot1 <- VariableFeaturePlot(srat)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE, xnudge = 0, ynudge = 0)
+
+plot1
+plot2
+```
+## Scaling
+
+Next, we apply a linear transformation (‘scaling’) that is a standard pre-processing step prior to dimensional reduction techniques like PCA. The ScaleData() function:
+
+-Shifts the expression of each gene, so that the mean expression across cells is 0
+-Scales the expression of each gene, so that the variance across cells is 1
+-This step gives equal weight in downstream analyses, so that highly-expressed genes do not dominate
+-The results of this are stored in pbmc[["RNA"]]@scale.data
+
+```{r}
+all.genes <- rownames(srat)
+srat <- ScaleData(srat, features = all.genes)
+```
+
+
+
+## Regress out Cell cycles
+First, we assign each cell a score, based on its expression of G2/M and S phase markers. These marker sets should be anticorrelated in their expression levels, and cells expressing neither are likely not cycling and in G1 phase.
+
+We assign scores in the CellCycleScoring() function, which stores S and G2/M scores in object meta data, along with the predicted classification of each cell in either G2M, S or G1 phase. CellCycleScoring() can also set the identity of the Seurat object to the cell-cycle phase by passing set.ident = TRUE (the original identities are stored as old.ident). Please note that Seurat does not use the discrete classifications (G2M/G1/S) in downstream cell cycle regression. Instead, it uses the quantitative scores for G2M and S phase. However, we provide our predicted classifications in case they are of interest.
+
+```{r}
+# Calculate the cell state based on cell cycle markers
+s.genes <- cc.genes.updated.2019$s.genes
+g2m.genes <- cc.genes.updated.2019$g2m.genes
+
+srat <- CellCycleScoring(srat, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
+table(srat[[]]$Phase)
+```
+```{r}
+# Visualize the distribution of cell cycle markers across
+RidgePlot(srat, features = c("PCNA", "TOP2A", "MCM6", "MKI67"), ncol = 2)
+```
+
+```{r}
+# Running a PCA on cell cycle genes reveals, unsurprisingly, that cells separate entirely by phase
+
+srat <- RunPCA(srat, features = c(s.genes, g2m.genes))
+DimPlot(srat)
+```
+### Normal regression for normal datasets
+```{r}
+# Let's regress it out
+#srat <- ScaleData(srat, vars.to.regress = c("S.Score", "G2M.Score"), features = rownames(srat))
+
+```
+
+### Regression in developmental dataset
+The procedure above removes all signal associated with cell cycle. In some cases, we’ve found that this can negatively impact downstream analysis, particularly in differentiating processes (like murine hematopoiesis), where stem cells are quiescent and differentiated cells are proliferating (or vice versa). In this case, regressing out all cell cycle effects can blur the distinction between stem and progenitor cells as well.
+
+As an alternative, we suggest regressing out the difference between the G2M and S phase scores. This means that signals separating non-cycling cells and cycling cells will be maintained, but differences in cell cycle phase among proliferating cells (which are often uninteresting), will be regressed out of the data
+
+```{r}
+## done on server, takes >4h
+srat$CC.Difference <- srat$S.Score - srat$G2M.Score
+srat <- ScaleData(srat, vars.to.regress = "CC.Difference", features = rownames(srat))
+```
+```{r}
+## reload and visual inspection
+srat <- readRDS(file = "~/OneDrive - Charité - Universitätsmedizin Berlin/Schuelke_Lab/EG15_RNA_Seq/Brain_organoids_scRNA_Seq/outputs/cortical_organoids_cell_cycle_regressed_out.rds") 
+
+```
+
+```{r}
+# Running a PCA on cell cycle genes again, to visualize the effects of regression
+
+srat <- RunPCA(srat, features = c(s.genes, g2m.genes))
+DimPlot(srat)
+```
+
+
+## Linear dimensionality reduction
+
+```{r}
+srat <- RunPCA(srat, features = VariableFeatures(object = srat))
+```
+
+```{r}
+# Visualize the PC loadings
+
+VizDimLoadings(srat, dims = 1:9, reduction = "pca") & 
+  theme(axis.text=element_text(size=5), axis.title=element_text(size=8,face="bold"))
+```
+```{r}
+# Visualize the heatmaps
+DimHeatmap(srat, dims = 1:15, nfeatures = 20, cells = 500, balanced = T)
+
+```
+
+```{r}
+## Let's assess how many PC we need for clustering
+
+ElbowPlot(srat)
+```
+The first big drop is at 10. We will start by using this value for clustering
+After regressing out cell cycle, elbow is at 9
+
+## Clustering
+```{r}
+srat <- FindNeighbors(srat, dims = 1:9) # 10 from before
+srat <- FindClusters(srat, resolution = 0.5)
+```
+### non-linear dimensional reduction UMAP
+
+```{r}
+srat <- RunUMAP(srat, dims = 1:9, verbose = F)
+table(srat@meta.data$seurat_clusters)  #shows the size of each cluster
+
+#Let's plot the UMAP
+DimPlot(srat,label.size = 4,repel = T,label = T)
+```
+```{r}
+## Intermediate file save
+saveRDS(srat, file = "~/OneDrive - Charité - Universitätsmedizin Berlin/Schuelke_Lab/EG15_RNA_Seq/Brain_organoids_scRNA_Seq/outputs/cortical_organoids_cell_cycle_regressed_out.rds")
+```
+
+
+
+
+
+## Identifying the Markers of each cluster
+
+```{r}
+## List of known markers
+huCortex_celltype_markers <- list(
+  Ex=c("SLC17A7", "CAMK2A","CHN1","SV2B","NRGN"),
+  In=c("GAD1", "GAD2", "SLC32A1"),
+  Ast=c("GFAP", "AQP4", "SLC4A4"),
+  Oli=c("PLP1", "MBP", "MOBP", "MOG"),
+  Mic=c("CSF1R", "CD74", "P2RY12"),
+  Opc=c("OLIG1", "OLIG2", "PDGFRA", "SOX10", "APOD"),
+  Endo=c("ATP10A", "CLDN5", "FLT1", "VWF"),
+  Per=c("PTH1R", "SLC6A12", "SLC19A1", "COLEC12", "SLC12A7")
+)
+
+## Find the markers within cluster
+# find markers for every cluster compared to all remaining cells, report only the positive
+# ones
+srat.markers <- FindAllMarkers(srat, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+srat.markers %>%
+    group_by(cluster) %>%
+    slice_max(n = 3, order_by = avg_log2FC)
+
+```
+markers based on atlas https://www.proteinatlas.org/ 
+
+cluster 1 -> NRN1 endothelial, DDIT4 	T-cells - Immune response
+cluster 2 -> NTS 	Endocrine cells, 
+            LMO3 (Alveolar cells type 1, Astrocytes, Alveolar cells type 2, Excitatory neurons, Oligodendrocyte precursor cells), RUNX1T1 Inhibitory neurons, Oligodendrocyte precursor cells, Excitatory neurons, Bipolar cells, Microglial cells
+cluster 3 -> BHLHE22 Horizontal cells, Bipolar cells; 
+              BCL11A dendritic cells, B-cells, Excitatory neurons, Langerhans cells, Basal squamous epithelial cells,               Squamous epithelial cells, Inhibitory neurons; 
+              STMN2 Excitatory neurons, Horizontal cells, Inhibitory neurons
+cluster 4 -> PTN Endometrial stromal cells, Extravillous trophoblasts, Muller glia cells, Squamous epithelial cells;
+            FABP7 Muller glia cells;
+            TTYH1 Muller glia cells
+Cluster 5 -> Muller glia cells, Late spermatids, Excitatory neurons;
+            NHLH1 Oligodendrocytes
+            EOMES Intermediate progenitor cells
+cluster 6 -> LMO3 Alveolar cells type 1, Astrocytes, Alveolar cells type 2, Excitatory neurons, Oligodendrocyte precursor cells;
+            GPR22 Inhibitory neurons, Excitatory neurons;
+            GRIA2 Excitatory neurons, Oligodendrocyte precursor cells, Inhibitory neurons, Astrocytes, Oligodendrocytes, Horizontal cells
+cluster 7 -> TOP2A Cell cycle regulation;
+            CENPF Cell cycle regulation;
+            HIST1H4C Cell proliferation
+cluster 8 -> CENPF Cell proliferation ;
+            PTTG1 Langerhans cells, Spermatocytes;
+            KPNA2 Spermatocytes, Cell cycle regulation
+cluster 9 -> CRYAB Schwann cells;
+            FTL Macrophages;
+            HSPA1A Langerhans cells
+cluster 10 -> TTR and CLU hepatocytes; 
+          CRYAB schwann cells
+cluster 11 -> Fibroblasts
+
+```{r}
+## Visualize the expression of some markers
+
+FeaturePlot(srat, features = c("SLC17A7", "NRN1", "IGFBP5", "STMN2", "THRA"))
+
+VlnPlot(srat, features = c("SLC17A7", "GAD1", "GFAP", "PLP1", "THRA"))
+
+
+```
+```{r}
+## Excitatory neurons
+VlnPlot(srat, features = c("SLC17A7", "CAMK2A","CHN1","SV2B","NRGN"))
+FeaturePlot(srat, features = c("SLC17A7", "CAMK2A","CHN1","SV2B","NRGN"))
+```
+
+```{r}
+## Inhibitory neurons
+VlnPlot(srat, features = c("GAD1", "GAD2", "SLC32A1"))
+FeaturePlot(srat, features = c("GAD1", "GAD2", "SLC32A1"))
+```
+
+```{r}
+## Astrocytes
+VlnPlot(srat, features = c("GFAP", "AQP4", "SLC4A4"))
+FeaturePlot(srat, features = c("GFAP", "AQP4", "SLC4A4"))
+```
+```{r}
+## Radial Glia 
+VlnPlot(srat, features = c("VIM"))
+FeaturePlot(srat, features = c("VIM"))
+```
+```{r}
+## Outer Radial Glia 
+VlnPlot(srat, features = c("HOPX"))
+FeaturePlot(srat, features = c("HOPX"))
+```
+```{r}
+## Intermediate progenitor cells
+VlnPlot(srat, features = c("EOMES"))
+FeaturePlot(srat, features = c("EOMES"))
+```
+
+
+```{r}
+## Neurons
+VlnPlot(srat, features = c("STMN2"))
+FeaturePlot(srat, features = c("STMN2"))
+```
+
+```{r}
+## Fibroblasts
+VlnPlot(srat, features = c("COL3A1"))
+FeaturePlot(srat, features = c("COL3A1"))
+```
+
+
+```{r}
+## Visualize heatmap of all the markers (max 20) per cluster
+srat.markers %>%
+    group_by(cluster) %>%
+    top_n(n = 10, wt = avg_log2FC) -> top10
+DoHeatmap(srat, features = top10$gene) + NoLegend()
+```
+
+## Add new labels
+```{r}
+new.cluster.ids <- c("Naive CD4 T", "CD14+ Mono", "Memory CD4 T", "B", "CD8 T", "FCGR3A+ Mono",
+    "NK", "DC", "Platelet")
+names(new.cluster.ids) <- levels(srat)
+srat <- RenameIdents(srat, new.cluster.ids)
+DimPlot(srat, reduction = "umap", label = TRUE, pt.size = 0.5) + NoLegend()
+```
+
+
+
+
+
+```{r}
+## save
+saveRDS(srat, file = "~/OneDrive - Charité - Universitätsmedizin Berlin/Schuelke_Lab/EG15_RNA_Seq/Brain_organoids_scRNA_Seq/outputs/cortical_organoids_results.rds")
+sessionInfo()
+```
+
