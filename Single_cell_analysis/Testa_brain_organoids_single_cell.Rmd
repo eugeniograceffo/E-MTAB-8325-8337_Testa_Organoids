@@ -22,6 +22,10 @@ library(sctransform)
 #library(Matrix.utils)
 ```
 
+# Loading all the dataset and performing QC filtering
+## S20276_177 (day 100)
+
+
 ```{r}
 ## Load dataset
 mat_S20276_177 <- Read10X("/home/data/Testa_organoids_scRNA/S20276_177/outs/filtered_feature_bc_matrix")
@@ -31,20 +35,23 @@ dimnames(mat_S20276_177)
 
 ```{r}
 ## Create Seurat object
-srat <- CreateSeuratObject(counts = mat_S20276_177, project = "S20276_177") 
+srat_S20276_177 <- CreateSeuratObject(counts = mat_S20276_177, project = "S20276_177") 
 
 #srat <- readRDS(file = "~/OneDrive - Charité - Universitätsmedizin Berlin/Schuelke_Lab/EG15_RNA_Seq/Brain_organoids_scRNA_Seq/outputs/cortical_organoids_results.rds") # reload if saved
-srat
+srat_S20276_177
 ```
 
 ```{r}
 ## Have a look
 mat <- NULL # saves RAM
-str(srat)
+str(srat_S20276_177)
 
-meta <- srat@meta.data
-dim(meta)
-head(meta)
+srat_S20276_177@meta.data <- srat_S20276_177@meta.data %>%
+  mutate("Timepoint" = as.factor("day_100")) %>%
+  relocate("Timepoint", .after="orig.ident")
+
+dim(srat_S20276_177@meta.data)
+head(srat_S20276_177@meta.data)
 
 ```
 
@@ -53,16 +60,16 @@ head(meta)
 ```{r}
 ## Let's do some QC
 #mitochondrial contamination
-srat[["percent.mt"]] <- PercentageFeatureSet(srat, pattern = "^MT-")
+srat_S20276_177[["percent.mt"]] <- PercentageFeatureSet(srat_S20276_177, pattern = "^MT-")
 
 # ribosomial protein (RPS or RPL)
-srat[["percent.rb"]] <- PercentageFeatureSet(srat, pattern = "^RP[SL]")
+srat_S20276_177[["percent.rb"]] <- PercentageFeatureSet(srat_S20276_177, pattern = "^RP[SL]")
 
-head(srat@meta.data, 5)
+head(srat_S20276_177@meta.data, 5)
 ```
 ```{r}
 # Visualize QC metrics as a violin plot
-VlnPlot(srat, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.rb"), ncol = 4)
+VlnPlot(srat_S20276_177, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.rb"), ncol = 4)
 
 ## looking at data, I would set 500<nFeature<9000 , perc.mt<12
 ```
@@ -72,17 +79,362 @@ VlnPlot(srat, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.r
 
 ## Let's have a look at some correlations
 
-FeatureScatter(srat, feature1 = "nCount_RNA", feature2 = "percent.mt") + geom_hline(yintercept=12, linetype="dashed", color = "blue")
-FeatureScatter(srat, feature1 = "nCount_RNA", feature2 = "nFeature_RNA") + geom_hline(yintercept=9000, linetype="dashed", color = "blue") + geom_hline(yintercept=500, linetype="dashed", color = "blue")
-FeatureScatter(srat, feature1 = "nCount_RNA", feature2 = "percent.rb")
+FeatureScatter(srat_S20276_177, feature1 = "nCount_RNA", feature2 = "percent.mt") + geom_hline(yintercept=12, linetype="dashed", color = "blue")
+FeatureScatter(srat_S20276_177, feature1 = "nCount_RNA", feature2 = "nFeature_RNA") + geom_hline(yintercept=9000, linetype="dashed", color = "blue") + geom_hline(yintercept=500, linetype="dashed", color = "blue")
+FeatureScatter(srat_S20276_177, feature1 = "nCount_RNA", feature2 = "percent.rb")
 
 # as expected, higher mt % correlates with low counts ie dead cells
 ```
 
 ```{r}
 ## apply filters
-srat <- subset(srat, subset = nFeature_RNA > 500 & nFeature_RNA < 9000 & percent.mt < 12)
+srat_S20276_177_filtered <- subset(srat, subset = nFeature_RNA > 500 & nFeature_RNA < 9000 & percent.mt < 12)
 ```
+
+
+## 3391B_D50 (day 50) - Sample 1
+
+```{r}
+## Load dataset
+mat_3391B_D50 <- Read10X("/home/data/Testa_organoids_scRNA/3391B_D50/outs/filtered_feature_bc_matrix")
+
+## Create Seurat object
+srat_3391B_D50 <- CreateSeuratObject(counts = mat_3391B_D50, project = "3391B_D50") 
+
+## save up RAM
+mat_3391B_D50 <- NULL # saves RAM
+
+## Add the timepoint to the metadata
+
+srat_3391B_D50@meta.data <- srat_3391B_D50@meta.data %>%
+  mutate("Timepoint" = as.factor("day_50")) %>%
+  relocate("Timepoint", .after="orig.ident")
+
+head(srat_3391B_D50@meta.data)
+
+## mitochondrial contamination
+srat_3391B_D50[["percent.mt"]] <- PercentageFeatureSet(srat_3391B_D50, pattern = "^MT-")
+
+## ribosomial protein (RPS or RPL)
+srat_3391B_D50[["percent.rb"]] <- PercentageFeatureSet(srat_3391B_D50, pattern = "^RP[SL]")
+
+## Visualize QC metrics as a violin plot
+VlnPlot(srat_3391B_D50, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.rb"), ncol = 4)
+
+```
+
+```{r}
+## Let's have a look at the graphs to set the thresholds 
+
+FeatureScatter(srat_3391B_D50, feature1 = "nCount_RNA", feature2 = "percent.mt") + geom_hline(yintercept=5, linetype="dashed", color = "blue")
+FeatureScatter(srat_3391B_D50, feature1 = "nCount_RNA", feature2 = "nFeature_RNA") + geom_hline(yintercept=9000, linetype="dashed", color = "blue") + geom_hline(yintercept=200, linetype="dashed", color = "blue")
+#FeatureScatter(srat_3391B_D50, feature1 = "nCount_RNA", feature2 = "percent.rb")
+```
+
+```{r}
+## apply filters
+srat_3391B_D50_filtered <- subset(srat_3391B_D50, subset = nFeature_RNA > 200 & nFeature_RNA < 9000 & percent.mt < 5)
+srat_3391B_D50 <- NULL # saves RAM
+```
+
+
+
+
+## kolf2c1day50 (day 50) - Sample 2
+
+```{r}
+## Load dataset
+mat_kolf2c1day50 <- Read10X("/home/data/Testa_organoids_scRNA/kolf2c1day50/outs/filtered_feature_bc_matrix")
+
+## Create Seurat object
+srat_kolf2c1day50 <- CreateSeuratObject(counts = mat_kolf2c1day50, project = "kolf2c1day50") 
+
+## save up RAM
+mat_kolf2c1day50 <- NULL # saves RAM
+
+## Add the timepoint to the metadata
+
+srat_kolf2c1day50@meta.data <- srat_kolf2c1day50@meta.data %>%
+  mutate("Timepoint" = as.factor("day_50")) %>%
+  relocate("Timepoint", .after="orig.ident")
+
+head(srat_kolf2c1day50@meta.data)
+
+## mitochondrial contamination
+srat_kolf2c1day50[["percent.mt"]] <- PercentageFeatureSet(srat_kolf2c1day50, pattern = "^MT-")
+
+## ribosomial protein (RPS or RPL)
+srat_kolf2c1day50[["percent.rb"]] <- PercentageFeatureSet(srat_kolf2c1day50, pattern = "^RP[SL]")
+
+## Visualize QC metrics as a violin plot
+VlnPlot(srat_kolf2c1day50, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.rb"), ncol = 4)
+
+```
+
+```{r}
+## Let's have a look at the graphs to set the thresholds 
+
+FeatureScatter(srat_kolf2c1day50, feature1 = "nCount_RNA", feature2 = "percent.mt") + geom_hline(yintercept=4, linetype="dashed", color = "blue")
+FeatureScatter(srat_kolf2c1day50, feature1 = "nCount_RNA", feature2 = "nFeature_RNA") + geom_hline(yintercept=9000, linetype="dashed", color = "blue") + geom_hline(yintercept=200, linetype="dashed", color = "blue")
+#FeatureScatter(srat_kolf2c1day50, feature1 = "nCount_RNA", feature2 = "percent.rb")
+```
+
+```{r}
+## apply filters
+srat_kolf2c1day50_filtered <- subset(srat_kolf2c1day50, subset = nFeature_RNA > 200 & nFeature_RNA < 9000 & percent.mt < 4)
+srat_kolf2c1day50 <- NULL # saves RAM
+```
+
+
+
+## G1_MIF1D50 (day 50) - Sample 3
+
+```{r}
+## Load dataset
+mat_G1_MIF1D50 <- Read10X("/home/data/Testa_organoids_scRNA/G1_MIF1D50/outs/filtered_feature_bc_matrix")
+
+## Create Seurat object
+srat_G1_MIF1D50 <- CreateSeuratObject(counts = mat_G1_MIF1D50, project = "G1_MIF1D50") 
+
+## save up RAM
+mat_G1_MIF1D50 <- NULL # saves RAM
+
+## Add the timepoint to the metadata
+
+srat_G1_MIF1D50@meta.data <- srat_G1_MIF1D50@meta.data %>%
+  mutate("Timepoint" = as.factor("day_50")) %>%
+  relocate("Timepoint", .after="orig.ident")
+
+head(srat_G1_MIF1D50@meta.data)
+
+## mitochondrial contamination
+srat_G1_MIF1D50[["percent.mt"]] <- PercentageFeatureSet(srat_G1_MIF1D50, pattern = "^MT-")
+
+## ribosomial protein (RPS or RPL)
+srat_G1_MIF1D50[["percent.rb"]] <- PercentageFeatureSet(srat_G1_MIF1D50, pattern = "^RP[SL]")
+
+## Visualize QC metrics as a violin plot
+VlnPlot(srat_G1_MIF1D50, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.rb"), ncol = 4)
+
+```
+
+```{r}
+## Let's have a look at the graphs to set the thresholds 
+
+FeatureScatter(srat_G1_MIF1D50, feature1 = "nCount_RNA", feature2 = "percent.mt") + geom_hline(yintercept=6, linetype="dashed", color = "blue")
+FeatureScatter(srat_G1_MIF1D50, feature1 = "nCount_RNA", feature2 = "nFeature_RNA") + geom_hline(yintercept=8000, linetype="dashed", color = "blue") + geom_hline(yintercept=200, linetype="dashed", color = "blue")
+#FeatureScatter(srat_G1_MIF1D50, feature1 = "nCount_RNA", feature2 = "percent.rb")
+```
+
+```{r}
+## apply filters
+srat_G1_MIF1D50_filtered <- subset(srat_G1_MIF1D50, subset = nFeature_RNA > 200 & nFeature_RNA < 8000 & percent.mt < 6)
+srat_G1_MIF1D50 <- NULL # saves RAM
+```
+
+
+## S20271_156 (day 100) - Sample 4
+
+```{r}
+## Load dataset
+mat_S20271_156 <- Read10X("/home/data/Testa_organoids_scRNA/S20271_156/outs/filtered_feature_bc_matrix")
+
+## Create Seurat object
+srat_S20271_156 <- CreateSeuratObject(counts = mat_S20271_156, project = "S20271_156") 
+
+## save up RAM
+mat_S20271_156 <- NULL # saves RAM
+
+## Add the timepoint to the metadata
+
+srat_S20271_156@meta.data <- srat_S20271_156@meta.data %>%
+  mutate("Timepoint" = as.factor("day_100")) %>%
+  relocate("Timepoint", .after="orig.ident")
+
+head(srat_S20271_156@meta.data)
+
+## mitochondrial contamination
+srat_S20271_156[["percent.mt"]] <- PercentageFeatureSet(srat_S20271_156, pattern = "^MT-")
+
+## ribosomial protein (RPS or RPL)
+srat_S20271_156[["percent.rb"]] <- PercentageFeatureSet(srat_S20271_156, pattern = "^RP[SL]")
+
+## Visualize QC metrics as a violin plot
+VlnPlot(srat_S20271_156, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.rb"), ncol = 4)
+
+```
+
+```{r}
+## Let's have a look at the graphs to set the thresholds 
+
+FeatureScatter(srat_S20271_156, feature1 = "nCount_RNA", feature2 = "percent.mt") + geom_hline(yintercept=8, linetype="dashed", color = "blue")
+FeatureScatter(srat_S20271_156, feature1 = "nCount_RNA", feature2 = "nFeature_RNA") + geom_hline(yintercept=9000, linetype="dashed", color = "blue") + geom_hline(yintercept=200, linetype="dashed", color = "blue")
+#FeatureScatter(srat_S20271_156, feature1 = "nCount_RNA", feature2 = "percent.rb")
+```
+
+```{r}
+## apply filters
+srat_S20271_156_filtered <- subset(srat_S20271_156, subset = nFeature_RNA > 200 & nFeature_RNA < 9000 & percent.mt < 8)
+srat_S20271_156 <- NULL # saves RAM
+```
+
+
+
+## S20269_154 (day 100) - Sample 5
+
+```{r}
+## Load dataset
+mat_S20269_154 <- Read10X("/home/data/Testa_organoids_scRNA/S20269_154/outs/filtered_feature_bc_matrix")
+
+## Create Seurat object
+srat_S20269_154 <- CreateSeuratObject(counts = mat_S20269_154, project = "S20269_154") 
+
+## save up RAM
+mat_S20269_154 <- NULL # saves RAM
+
+## Add the timepoint to the metadata
+
+srat_S20269_154@meta.data <- srat_S20269_154@meta.data %>%
+  mutate("Timepoint" = as.factor("day_100")) %>%
+  relocate("Timepoint", .after="orig.ident")
+
+head(srat_S20269_154@meta.data)
+
+## mitochondrial contamination
+srat_S20269_154[["percent.mt"]] <- PercentageFeatureSet(srat_S20269_154, pattern = "^MT-")
+
+## ribosomial protein (RPS or RPL)
+srat_S20269_154[["percent.rb"]] <- PercentageFeatureSet(srat_S20269_154, pattern = "^RP[SL]")
+
+## Visualize QC metrics as a violin plot
+VlnPlot(srat_S20269_154, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.rb"), ncol = 4)
+
+```
+
+```{r}
+## Let's have a look at the graphs to set the thresholds 
+
+FeatureScatter(srat_S20269_154, feature1 = "nCount_RNA", feature2 = "percent.mt") + geom_hline(yintercept=8, linetype="dashed", color = "blue")
+FeatureScatter(srat_S20269_154, feature1 = "nCount_RNA", feature2 = "nFeature_RNA") + geom_hline(yintercept=9000, linetype="dashed", color = "blue") + geom_hline(yintercept=200, linetype="dashed", color = "blue")
+#FeatureScatter(srat_S20269_154, feature1 = "nCount_RNA", feature2 = "percent.rb")
+```
+
+```{r}
+## apply filters
+srat_S20269_154_filtered <- subset(srat_S20269_154, subset = nFeature_RNA > 200 & nFeature_RNA < 9000 & percent.mt < 8)
+srat_S20269_154 <- NULL # saves RAM
+```
+
+
+## S20265_136 (day 100) - Sample 6
+
+```{r}
+## Load dataset
+mat_S20265_136 <- Read10X("/home/data/Testa_organoids_scRNA/S20265_136/outs/filtered_feature_bc_matrix")
+
+## Create Seurat object
+srat_S20265_136 <- CreateSeuratObject(counts = mat_S20265_136, project = "S20265_136") 
+
+## save up RAM
+mat_S20265_136 <- NULL # saves RAM
+
+## Add the timepoint to the metadata
+
+srat_S20265_136@meta.data <- srat_S20265_136@meta.data %>%
+  mutate("Timepoint" = as.factor("day_100")) %>%
+  relocate("Timepoint", .after="orig.ident")
+
+head(srat_S20265_136@meta.data)
+
+## mitochondrial contamination
+srat_S20265_136[["percent.mt"]] <- PercentageFeatureSet(srat_S20265_136, pattern = "^MT-")
+
+## ribosomial protein (RPS or RPL)
+srat_S20265_136[["percent.rb"]] <- PercentageFeatureSet(srat_S20265_136, pattern = "^RP[SL]")
+
+## Visualize QC metrics as a violin plot
+VlnPlot(srat_S20265_136, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.rb"), ncol = 4)
+
+```
+
+```{r}
+## Let's have a look at the graphs to set the thresholds 
+
+FeatureScatter(srat_S20265_136, feature1 = "nCount_RNA", feature2 = "percent.mt") + geom_hline(yintercept=10, linetype="dashed", color = "blue")
+FeatureScatter(srat_S20265_136, feature1 = "nCount_RNA", feature2 = "nFeature_RNA") + geom_hline(yintercept=9000, linetype="dashed", color = "blue") + geom_hline(yintercept=200, linetype="dashed", color = "blue")
+#FeatureScatter(srat_S20265_136, feature1 = "nCount_RNA", feature2 = "percent.rb")
+```
+
+```{r}
+## apply filters
+srat_S20265_136_filtered <- subset(srat_S20265_136, subset = nFeature_RNA > 200 & nFeature_RNA < 9000 & percent.mt < 10)
+srat_S20265_136 <- NULL # saves RAM
+```
+
+
+
+## S20276_177 (day 100) - Sample 7
+
+```{r}
+## Load dataset
+mat_S20276_177 <- Read10X("/home/data/Testa_organoids_scRNA/S20276_177/outs/filtered_feature_bc_matrix")
+
+## Create Seurat object
+srat_S20276_177 <- CreateSeuratObject(counts = mat_S20276_177, project = "S20276_177") 
+
+## save up RAM
+mat_S20276_177 <- NULL # saves RAM
+
+## Add the timepoint to the metadata
+
+srat_S20276_177@meta.data <- srat_S20276_177@meta.data %>%
+  mutate("Timepoint" = as.factor("day_100")) %>%
+  relocate("Timepoint", .after="orig.ident")
+
+head(srat_S20276_177@meta.data)
+
+## mitochondrial contamination
+srat_S20276_177[["percent.mt"]] <- PercentageFeatureSet(srat_S20276_177, pattern = "^MT-")
+
+## ribosomial protein (RPS or RPL)
+srat_S20276_177[["percent.rb"]] <- PercentageFeatureSet(srat_S20276_177, pattern = "^RP[SL]")
+
+## Visualize QC metrics as a violin plot
+VlnPlot(srat_S20276_177, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.rb"), ncol = 4)
+
+```
+
+```{r}
+## Let's have a look at the graphs to set the thresholds 
+
+FeatureScatter(srat_S20276_177, feature1 = "nCount_RNA", feature2 = "percent.mt") + geom_hline(yintercept=4, linetype="dashed", color = "blue")
+FeatureScatter(srat_S20276_177, feature1 = "nCount_RNA", feature2 = "nFeature_RNA") + geom_hline(yintercept=9000, linetype="dashed", color = "blue") + geom_hline(yintercept=200, linetype="dashed", color = "blue")
+#FeatureScatter(srat_S20276_177, feature1 = "nCount_RNA", feature2 = "percent.rb")
+```
+
+```{r}
+## apply filters
+srat_S20276_177_filtered <- subset(srat_S20276_177, subset = nFeature_RNA > 200 & nFeature_RNA < 9000 & percent.mt < 4)
+srat_S20276_177 <- NULL # saves RAM
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## Normalization 
 
