@@ -22,75 +22,7 @@ library(sctransform)
 #library(Matrix.utils)
 ```
 
-# Loading all the dataset and performing QC filtering
-## S20276_177 (day 100)
-
-
-```{r}
-## Load dataset
-mat_S20276_177 <- Read10X("/home/data/Testa_organoids_scRNA/S20276_177/outs/filtered_feature_bc_matrix")
-
-dimnames(mat_S20276_177)
-```
-
-```{r}
-## Create Seurat object
-srat_S20276_177 <- CreateSeuratObject(counts = mat_S20276_177, project = "S20276_177") 
-
-#srat <- readRDS(file = "~/OneDrive - Charité - Universitätsmedizin Berlin/Schuelke_Lab/EG15_RNA_Seq/Brain_organoids_scRNA_Seq/outputs/cortical_organoids_results.rds") # reload if saved
-srat_S20276_177
-```
-
-```{r}
-## Have a look
-mat <- NULL # saves RAM
-str(srat_S20276_177)
-
-srat_S20276_177@meta.data <- srat_S20276_177@meta.data %>%
-  mutate("Timepoint" = as.factor("day_100")) %>%
-  relocate("Timepoint", .after="orig.ident")
-
-dim(srat_S20276_177@meta.data)
-head(srat_S20276_177@meta.data)
-
-```
-
-
-## Quality Control
-```{r}
-## Let's do some QC
-#mitochondrial contamination
-srat_S20276_177[["percent.mt"]] <- PercentageFeatureSet(srat_S20276_177, pattern = "^MT-")
-
-# ribosomial protein (RPS or RPL)
-srat_S20276_177[["percent.rb"]] <- PercentageFeatureSet(srat_S20276_177, pattern = "^RP[SL]")
-
-head(srat_S20276_177@meta.data, 5)
-```
-```{r}
-# Visualize QC metrics as a violin plot
-VlnPlot(srat_S20276_177, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.rb"), ncol = 4)
-
-## looking at data, I would set 500<nFeature<9000 , perc.mt<12
-```
-```{r}
-# FeatureScatter is typically used to visualize feature-feature relationships, but can be used
-# for anything calculated by the object, i.e. columns in object metadata, PC scores etc.
-
-## Let's have a look at some correlations
-
-FeatureScatter(srat_S20276_177, feature1 = "nCount_RNA", feature2 = "percent.mt") + geom_hline(yintercept=12, linetype="dashed", color = "blue")
-FeatureScatter(srat_S20276_177, feature1 = "nCount_RNA", feature2 = "nFeature_RNA") + geom_hline(yintercept=9000, linetype="dashed", color = "blue") + geom_hline(yintercept=500, linetype="dashed", color = "blue")
-FeatureScatter(srat_S20276_177, feature1 = "nCount_RNA", feature2 = "percent.rb")
-
-# as expected, higher mt % correlates with low counts ie dead cells
-```
-
-```{r}
-## apply filters
-srat_S20276_177_filtered <- subset(srat, subset = nFeature_RNA > 500 & nFeature_RNA < 9000 & percent.mt < 12)
-```
-
+# Loading all the datasets separately and performing QC filtering
 
 ## 3391B_D50 (day 50) - Sample 1
 
@@ -108,7 +40,8 @@ mat_3391B_D50 <- NULL # saves RAM
 
 srat_3391B_D50@meta.data <- srat_3391B_D50@meta.data %>%
   mutate("Timepoint" = as.factor("day_50")) %>%
-  relocate("Timepoint", .after="orig.ident")
+  relocate("Timepoint", .after="orig.ident") %>%
+  rename("Sample"="orig.ident")
 
 head(srat_3391B_D50@meta.data)
 
@@ -156,7 +89,8 @@ mat_kolf2c1day50 <- NULL # saves RAM
 
 srat_kolf2c1day50@meta.data <- srat_kolf2c1day50@meta.data %>%
   mutate("Timepoint" = as.factor("day_50")) %>%
-  relocate("Timepoint", .after="orig.ident")
+  relocate("Timepoint", .after="orig.ident") %>%
+  rename("Sample"="orig.ident")
 
 head(srat_kolf2c1day50@meta.data)
 
@@ -203,7 +137,8 @@ mat_G1_MIF1D50 <- NULL # saves RAM
 
 srat_G1_MIF1D50@meta.data <- srat_G1_MIF1D50@meta.data %>%
   mutate("Timepoint" = as.factor("day_50")) %>%
-  relocate("Timepoint", .after="orig.ident")
+  relocate("Timepoint", .after="orig.ident") %>%
+  rename("Sample"="orig.ident")
 
 head(srat_G1_MIF1D50@meta.data)
 
@@ -222,13 +157,13 @@ VlnPlot(srat_G1_MIF1D50, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"
 ## Let's have a look at the graphs to set the thresholds 
 
 FeatureScatter(srat_G1_MIF1D50, feature1 = "nCount_RNA", feature2 = "percent.mt") + geom_hline(yintercept=6, linetype="dashed", color = "blue")
-FeatureScatter(srat_G1_MIF1D50, feature1 = "nCount_RNA", feature2 = "nFeature_RNA") + geom_hline(yintercept=8000, linetype="dashed", color = "blue") + geom_hline(yintercept=200, linetype="dashed", color = "blue")
+FeatureScatter(srat_G1_MIF1D50, feature1 = "nCount_RNA", feature2 = "nFeature_RNA") + geom_hline(yintercept=9000, linetype="dashed", color = "blue") + geom_hline(yintercept=200, linetype="dashed", color = "blue")
 #FeatureScatter(srat_G1_MIF1D50, feature1 = "nCount_RNA", feature2 = "percent.rb")
 ```
 
 ```{r}
 ## apply filters
-srat_G1_MIF1D50_filtered <- subset(srat_G1_MIF1D50, subset = nFeature_RNA > 200 & nFeature_RNA < 8000 & percent.mt < 6)
+srat_G1_MIF1D50_filtered <- subset(srat_G1_MIF1D50, subset = nFeature_RNA > 200 & nFeature_RNA < 9000 & percent.mt < 6)
 srat_G1_MIF1D50 <- NULL # saves RAM
 ```
 
@@ -249,7 +184,8 @@ mat_S20271_156 <- NULL # saves RAM
 
 srat_S20271_156@meta.data <- srat_S20271_156@meta.data %>%
   mutate("Timepoint" = as.factor("day_100")) %>%
-  relocate("Timepoint", .after="orig.ident")
+  relocate("Timepoint", .after="orig.ident") %>%
+  rename("Sample"="orig.ident")
 
 head(srat_S20271_156@meta.data)
 
@@ -296,7 +232,8 @@ mat_S20269_154 <- NULL # saves RAM
 
 srat_S20269_154@meta.data <- srat_S20269_154@meta.data %>%
   mutate("Timepoint" = as.factor("day_100")) %>%
-  relocate("Timepoint", .after="orig.ident")
+  relocate("Timepoint", .after="orig.ident") %>%
+  rename("Sample"="orig.ident")
 
 head(srat_S20269_154@meta.data)
 
@@ -314,14 +251,14 @@ VlnPlot(srat_S20269_154, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"
 ```{r}
 ## Let's have a look at the graphs to set the thresholds 
 
-FeatureScatter(srat_S20269_154, feature1 = "nCount_RNA", feature2 = "percent.mt") + geom_hline(yintercept=8, linetype="dashed", color = "blue")
+FeatureScatter(srat_S20269_154, feature1 = "nCount_RNA", feature2 = "percent.mt") + geom_hline(yintercept=9, linetype="dashed", color = "blue")
 FeatureScatter(srat_S20269_154, feature1 = "nCount_RNA", feature2 = "nFeature_RNA") + geom_hline(yintercept=9000, linetype="dashed", color = "blue") + geom_hline(yintercept=200, linetype="dashed", color = "blue")
 #FeatureScatter(srat_S20269_154, feature1 = "nCount_RNA", feature2 = "percent.rb")
 ```
 
 ```{r}
 ## apply filters
-srat_S20269_154_filtered <- subset(srat_S20269_154, subset = nFeature_RNA > 200 & nFeature_RNA < 9000 & percent.mt < 8)
+srat_S20269_154_filtered <- subset(srat_S20269_154, subset = nFeature_RNA > 200 & nFeature_RNA < 9000 & percent.mt < 9)
 srat_S20269_154 <- NULL # saves RAM
 ```
 
@@ -342,7 +279,8 @@ mat_S20265_136 <- NULL # saves RAM
 
 srat_S20265_136@meta.data <- srat_S20265_136@meta.data %>%
   mutate("Timepoint" = as.factor("day_100")) %>%
-  relocate("Timepoint", .after="orig.ident")
+  relocate("Timepoint", .after="orig.ident") %>%
+  rename("Sample"="orig.ident")
 
 head(srat_S20265_136@meta.data)
 
@@ -389,7 +327,8 @@ mat_S20276_177 <- NULL # saves RAM
 
 srat_S20276_177@meta.data <- srat_S20276_177@meta.data %>%
   mutate("Timepoint" = as.factor("day_100")) %>%
-  relocate("Timepoint", .after="orig.ident")
+  relocate("Timepoint", .after="orig.ident") %>%
+  rename("Sample"="orig.ident")
 
 head(srat_S20276_177@meta.data)
 
@@ -407,25 +346,128 @@ VlnPlot(srat_S20276_177, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"
 ```{r}
 ## Let's have a look at the graphs to set the thresholds 
 
-FeatureScatter(srat_S20276_177, feature1 = "nCount_RNA", feature2 = "percent.mt") + geom_hline(yintercept=4, linetype="dashed", color = "blue")
+FeatureScatter(srat_S20276_177, feature1 = "nCount_RNA", feature2 = "percent.mt") + geom_hline(yintercept=5, linetype="dashed", color = "blue")
 FeatureScatter(srat_S20276_177, feature1 = "nCount_RNA", feature2 = "nFeature_RNA") + geom_hline(yintercept=9000, linetype="dashed", color = "blue") + geom_hline(yintercept=200, linetype="dashed", color = "blue")
 #FeatureScatter(srat_S20276_177, feature1 = "nCount_RNA", feature2 = "percent.rb")
 ```
 
 ```{r}
 ## apply filters
-srat_S20276_177_filtered <- subset(srat_S20276_177, subset = nFeature_RNA > 200 & nFeature_RNA < 9000 & percent.mt < 4)
+srat_S20276_177_filtered <- subset(srat_S20276_177, subset = nFeature_RNA > 200 & nFeature_RNA < 9000 & percent.mt < 5)
 srat_S20276_177 <- NULL # saves RAM
 ```
 
 
 
+# Merging the filtered datasets together and performing data integration using Harmony
+## link -> https://hbctraining.github.io/scRNA-seq_online/lessons/06a_integration_harmony.html
+
+```{r}
+## create a list of all the samples
+list_filtered_srat <- c( srat_3391B_D50_filtered, srat_kolf2c1day50_filtered, srat_G1_MIF1D50_filtered, srat_S20271_156_filtered, srat_S20269_154_filtered, srat_S20265_136_filtered,srat_S20276_177_filtered)
+
+## merge
+merged_seurat <- merge(x = list_filtered_srat[[1]],
+		       y = list_filtered_srat[2:length(list_filtered_srat)],
+		       merge.data = TRUE)
+
+## save RAM
+srat_3391B_D50_filtered <- NULL
+srat_kolf2c1day50_filtered <- NULL
+srat_G1_MIF1D50_filtered <- NULL
+srat_S20271_156_filtered <- NULL
+srat_S20269_154_filtered <- NULL
+srat_S20265_136_filtered <- NULL
+srat_S20276_177_filtered <- NULL
+
+
+## Let's have a look at the number of cells coming from all the individual samples
+table(merged_seurat$Sample)
+
+## Save the merged Seurat object
+saveRDS(merged_seurat, "/home/data/Testa_organoids_scRNA/Seurat_code/outputs/merged_dataset_raw.rds")
+```
 
 
 
+## Perform log-normalization and feature selection, as well as SCT normalization on global object
+
+```{r}
+merged_seurat <- merged_seurat %>%
+    NormalizeData() %>%
+    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
+    ScaleData() %>%
+    SCTransform(vars.to.regress = c("percent.mt"))
+
+# Calculate PCs using variable features determined by SCTransform (3000 by default)
+merged_seurat <- RunPCA(merged_seurat, assay = "SCT", npcs = 50)
+
+## Save the merged Seurat object
+saveRDS(merged_seurat, "/home/data/Testa_organoids_scRNA/Seurat_code/outputs/merged_dataset_scaled.rds")
+```
+
+## Run Harmony
+```{r}
+harmonized_seurat <- RunHarmony(merged_seurat, 
+				group.by.vars = c("Sample", "Timepoint"), 
+				reduction = "pca", assay.use = "SCT", reduction.save = "harmony")
+
+## Save the integrated Seurat object
+saveRDS(harmonized_seurat, "/home/data/Testa_organoids_scRNA/Seurat_code/outputs/merged_dataset_harmonized.rds")
+```
 
 
+# Dimentionality reduction and UMAP
+## Run the computations
+```{r}
+## harmonized dataset
+harmonized_seurat <- RunUMAP(harmonized_seurat, reduction = "harmony", assay = "SCT", dims = 1:50)
+harmonized_seurat <- FindNeighbors(object = harmonized_seurat, reduction = "harmony")
+harmonized_seurat <- FindClusters(harmonized_seurat, resolution = 0.55)
 
+table(harmonized_seurat@meta.data$seurat_clusters)  #shows the size of each cluster
+
+## Save the integrated Seurat object
+saveRDS(harmonized_seurat, "/home/data/Testa_organoids_scRNA/Seurat_code/outputs/merged_dataset_harmonized.rds")
+
+
+## merged dataset
+merged_seurat <- RunUMAP(merged_seurat, reduction = "pca", assay = "SCT", dims = 1:40)
+merged_seurat <- FindNeighbors(object = merged_seurat, reduction = "pca")
+merged_seurat <- FindClusters(merged_seurat, resolution = 0.5)
+
+table(merged_seurat@meta.data$seurat_clusters)  #shows the size of each cluster
+
+## Save the merged Seurat object
+saveRDS(merged_seurat, "/home/data/Testa_organoids_scRNA/Seurat_code/outputs/merged_dataset_scaled.rds")
+
+```
+## Plot the two datasets to visualize the difference
+
+```{r}
+DimPlot(merged_seurat, reduction="umap", group.by = "Timepoint")
+DimPlot(harmonized_seurat, reduction="umap", group.by = "Timepoint")
+
+DimPlot(merged_seurat, reduction="umap", group.by = "Sample")
+DimPlot(harmonized_seurat, reduction="umap", group.by = "Sample")
+```
+
+## Let's plot the clusters
+```{r}
+DimPlot(merged_seurat,label.size = 4,repel = T,label = T)
+DimPlot(harmonized_seurat,label.size = 4,repel = T,label = T)
+```
+# Annotating the clusters
+```{r}
+## Excitatory neurons
+VlnPlot(harmonized_seurat, features = c("DCX"))
+FeaturePlot(harmonized_seurat, features = c("DCX"))
+FeaturePlot(harmonized_seurat, features = c("THRA"))
+FeaturePlot(harmonized_seurat, features = c("THRA1"))
+FeaturePlot(harmonized_seurat, features = c("THRA2"))
+VlnPlot(harmonized_seurat, features = c("THRA1"))
+VlnPlot(harmonized_seurat, features = c("THRA2"))
+```
 
 
 
