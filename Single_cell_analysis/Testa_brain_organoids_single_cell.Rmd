@@ -451,7 +451,7 @@ DimPlot(harmonized_seurat, reduction="umap", group.by = "Timepoint")
 DimPlot(merged_seurat, reduction="umap", group.by = "Sample")
 DimPlot(harmonized_seurat, reduction="umap", group.by = "Sample")
 ```
-
+# Cluster identification
 ## Let's plot the clusters
 ```{r}
 DimPlot(merged_seurat,label.size = 4,repel = T,label = T)
@@ -459,7 +459,7 @@ DimPlot(harmonized_seurat,label.size = 4,repel = T,label = T)
 ```
 # Annotating the clusters
 ```{r}
-## Excitatory neurons
+## Some exploration
 VlnPlot(harmonized_seurat, features = c("DCX"))
 FeaturePlot(harmonized_seurat, features = c("DCX"))
 FeaturePlot(harmonized_seurat, features = c("THRA"))
@@ -470,53 +470,185 @@ VlnPlot(harmonized_seurat, features = c("THRA2"))
 ```
 
 
-
-
-
-
-
-
-
-
-## Normalization 
-
-After removing unwanted cells from the dataset, the next step is to normalize the data. By default, we employ a global-scaling normalization method “LogNormalize” that normalizes the feature expression measurements for each cell by the total expression, multiplies this by a scale factor (10,000 by default), and log-transforms the result. Normalized values are stored in pbmc[["RNA"]]@data.
+## Identifying the Markers of each cluster
 
 ```{r}
-## Let's normalize
-srat <- NormalizeData(srat, normalization.method = "LogNormalize", scale.factor = 10000)
-```
+## List of known markers
+huCortex_celltype_markers <- list(
+  Ex=c("SLC17A7", "CAMK2A","CHN1","SV2B","NRGN"),
+  In=c("GAD1", "GAD2", "SLC32A1"),
+  Ast=c("GFAP", "AQP4", "SLC4A4"),
+  Oli=c("PLP1", "MBP", "MOBP", "MOG"),
+  Mic=c("CSF1R", "CD74", "P2RY12"),
+  Opc=c("OLIG1", "OLIG2", "PDGFRA", "SOX10", "APOD"),
+  Endo=c("ATP10A", "CLDN5", "FLT1", "VWF"),
+  Per=c("PTH1R", "SLC6A12", "SLC19A1", "COLEC12", "SLC12A7")
+)
 
-## Feature Selection
+## Find the markers within cluster
+# find markers for every cluster compared to all remaining cells, report only the positive ones
+srat.markers <- FindAllMarkers(harmonized_seurat, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
+srat.markers %>%
+    group_by(cluster) %>%
+    slice_max(n = 3, order_by = avg_log2FC)
+
+```
+markers based on atlas https://www.proteinatlas.org/ 
+
+cluster 0 -> STMN2 Excitatory neurons, Horizontal cells, Inhibitory neurons;
+            NNAT Muller glia, excitatory neurons;
+            NRXN3 nhibitory neurons, Excitatory neurons, Oligodendrocytes;
+            
+cluster 1 -> PIH1D1 Fibroblasts
+            AIMP2 RNA binding
+            PLCG2 Plasma cells, Microglial cells, B-cells, NK-cells
+            
+cluster 11 -> CRABP1 Muller glia cells
+            DCC Neurons and oligodendrocytes
+            HES6
+
+
+
+
+
+
+
+
+
+
+
+
+
+cluster 1 -> NRN1 endothelial, DDIT4 	T-cells - Immune response
+cluster 2 -> NTS 	Endocrine cells, 
+            LMO3 (Alveolar cells type 1, Astrocytes, Alveolar cells type 2, Excitatory neurons, Oligodendrocyte precursor cells), RUNX1T1 Inhibitory neurons, Oligodendrocyte precursor cells, Excitatory neurons, Bipolar cells, Microglial cells
+cluster 3 -> BHLHE22 Horizontal cells, Bipolar cells; 
+              BCL11A dendritic cells, B-cells, Excitatory neurons, Langerhans cells, Basal squamous epithelial cells,               Squamous epithelial cells, Inhibitory neurons; 
+              STMN2 Excitatory neurons, Horizontal cells, Inhibitory neurons
+cluster 4 -> PTN Endometrial stromal cells, Extravillous trophoblasts, Muller glia cells, Squamous epithelial cells;
+            FABP7 Muller glia cells;
+            TTYH1 Muller glia cells
+Cluster 5 -> Muller glia cells, Late spermatids, Excitatory neurons;
+            NHLH1 Oligodendrocytes
+            EOMES Intermediate progenitor cells
+cluster 6 -> LMO3 Alveolar cells type 1, Astrocytes, Alveolar cells type 2, Excitatory neurons, Oligodendrocyte precursor cells;
+            GPR22 Inhibitory neurons, Excitatory neurons;
+            GRIA2 Excitatory neurons, Oligodendrocyte precursor cells, Inhibitory neurons, Astrocytes, Oligodendrocytes, Horizontal cells
+cluster 7 -> TOP2A Cell cycle regulation;
+            CENPF Cell cycle regulation;
+            HIST1H4C Cell proliferation
+cluster 8 -> CENPF Cell proliferation ;
+            PTTG1 Langerhans cells, Spermatocytes;
+            KPNA2 Spermatocytes, Cell cycle regulation
+cluster 9 -> CRYAB Schwann cells;
+            FTL Macrophages;
+            HSPA1A Langerhans cells
+cluster 10 -> TTR and CLU hepatocytes; 
+          CRYAB schwann cells
+cluster 11 -> Fibroblasts
 
 ```{r}
-##Let's find the most variable features(genes) to use downstream
-srat <- FindVariableFeatures(srat, selection.method = "vst", nfeatures = 2000)
+## Visualize the expression of some markers
 
-# Identify the 10 most highly variable genes
-top10 <- head(VariableFeatures(srat), 10)
-top10
+FeaturePlot(harmonized_seurat, features = c("SLC17A7", "NRN1", "IGFBP5", "STMN2", "THRA"))
 
-# plot variable features with and without labels
-plot1 <- VariableFeaturePlot(srat)
-plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE, xnudge = 0, ynudge = 0)
+VlnPlot(harmonized_seurat, features = c("SLC17A7", "GAD1", "GFAP", "PLP1", "THRA"))
 
-plot1
-plot2
+
 ```
-## Scaling
-
-Next, we apply a linear transformation (‘scaling’) that is a standard pre-processing step prior to dimensional reduction techniques like PCA. The ScaleData() function:
-
--Shifts the expression of each gene, so that the mean expression across cells is 0
--Scales the expression of each gene, so that the variance across cells is 1
--This step gives equal weight in downstream analyses, so that highly-expressed genes do not dominate
--The results of this are stored in pbmc[["RNA"]]@scale.data
 
 ```{r}
-all.genes <- rownames(srat)
-srat <- ScaleData(srat, features = all.genes)
+## Fibroblasts
+VlnPlot(harmonized_seurat, features = c("VIM", "FAP", "COL3A1"))
+FeaturePlot(harmonized_seurat, features =c("VIM", "FAP", "COL3A1"))
 ```
+
+
+
+```{r}
+## Excitatory neurons
+VlnPlot(harmonized_seurat, features = c("SLC17A7", "CAMK2A","CHN1","SV2B","NRGN"))
+FeaturePlot(harmonized_seurat, features = c("SLC17A7", "CAMK2A","CHN1","SV2B","NRGN"))
+```
+
+```{r}
+## Inhibitory neurons
+VlnPlot(harmonized_seurat, features = c("GAD1", "GAD2", "SLC32A1"))
+FeaturePlot(harmonized_seurat, features = c("GAD1", "GAD2", "SLC32A1"))
+```
+
+```{r}
+## Astrocytes
+VlnPlot(harmonized_seurat, features = c("GFAP", "AQP4", "SLC4A4"))
+FeaturePlot(harmonized_seurat, features = c("GFAP", "AQP4", "SLC4A4"))
+```
+```{r}
+## Radial Glia 
+VlnPlot(harmonized_seurat, features = c("VIM"))
+FeaturePlot(harmonized_seurat, features = c("VIM"))
+```
+
+```{r}
+## Proliferating Radial Glia 
+VlnPlot(harmonized_seurat, features = c("AURKA", "UBEC2C", "TACC3"))
+FeaturePlot(harmonized_seurat, features = c("AURKA", "UBEC2C", "TACC3"))
+```
+
+
+```{r}
+## Outer Radial Glia 
+VlnPlot(harmonized_seurat, features = c("HOPX"))
+FeaturePlot(harmonized_seurat, features = c("HOPX"))
+```
+```{r}
+## Choroid 
+VlnPlot(harmonized_seurat, features = c("CXCL14", "PLS3", "TTR"))
+FeaturePlot(harmonized_seurat, features = c("CXCL14", "PLS3", "TTR"))
+```
+
+```{r}
+## Intermediate progenitor cells
+VlnPlot(harmonized_seurat, features = c("SMOC1", "IFITM3", "HES1"))
+FeaturePlot(harmonized_seurat, features = c("SMOC1", "IFITM3", "HES1"))
+```
+
+
+```{r}
+## Neurons
+VlnPlot(harmonized_seurat, features = c("STMN2", "GNG3", "DCX"))
+FeaturePlot(harmonized_seurat, features = c("STMN2", "GNG3", "DCX"))
+```
+```{r}
+## Cortical layer Neurons
+VlnPlot(harmonized_seurat, features = c("POU3F2", "RBFOX3", "BCL11B"))
+FeaturePlot(harmonized_seurat, features = c("POU3F2", "RBFOX3", "BCL11B"))
+```
+
+```{r}
+## Cortical upper layer Neurons
+VlnPlot(harmonized_seurat, features = c("SATB2", "POU3F2"))
+FeaturePlot(harmonized_seurat, features = c("SATB2", "POU3F2"))
+```
+
+```{r}
+## Visualize heatmap of all the markers (max 20) per cluster
+srat.markers %>%
+    group_by(cluster) %>%
+    top_n(n = 10, wt = avg_log2FC) -> top10
+DoHeatmap(srat, features = top10$gene) + NoLegend()
+```
+
+## Add new labels
+```{r}
+new.cluster.ids <- c("Naive CD4 T", "CD14+ Mono", "Memory CD4 T", "B", "CD8 T", "FCGR3A+ Mono",
+    "NK", "DC", "Platelet")
+names(new.cluster.ids) <- levels(srat)
+srat <- RenameIdents(srat, new.cluster.ids)
+DimPlot(srat, reduction = "umap", label = TRUE, pt.size = 0.5) + NoLegend()
+```
+
+
+
 
 
 
@@ -574,182 +706,6 @@ srat <- RunPCA(srat, features = c(s.genes, g2m.genes))
 DimPlot(srat)
 ```
 
-
-## Linear dimensionality reduction
-
-```{r}
-srat <- RunPCA(srat, features = VariableFeatures(object = srat))
-```
-
-```{r}
-# Visualize the PC loadings
-
-VizDimLoadings(srat, dims = 1:9, reduction = "pca") & 
-  theme(axis.text=element_text(size=5), axis.title=element_text(size=8,face="bold"))
-```
-```{r}
-# Visualize the heatmaps
-DimHeatmap(srat, dims = 1:15, nfeatures = 20, cells = 500, balanced = T)
-
-```
-
-```{r}
-## Let's assess how many PC we need for clustering
-
-ElbowPlot(srat)
-```
-The first big drop is at 10. We will start by using this value for clustering
-After regressing out cell cycle, elbow is at 9
-
-## Clustering
-```{r}
-srat <- FindNeighbors(srat, dims = 1:9) # 10 from before
-srat <- FindClusters(srat, resolution = 0.5)
-```
-### non-linear dimensional reduction UMAP
-
-```{r}
-srat <- RunUMAP(srat, dims = 1:9, verbose = F)
-table(srat@meta.data$seurat_clusters)  #shows the size of each cluster
-
-#Let's plot the UMAP
-DimPlot(srat,label.size = 4,repel = T,label = T)
-```
-```{r}
-## Intermediate file save
-saveRDS(srat, file = "~/OneDrive - Charité - Universitätsmedizin Berlin/Schuelke_Lab/EG15_RNA_Seq/Brain_organoids_scRNA_Seq/outputs/cortical_organoids_cell_cycle_regressed_out.rds")
-```
-
-
-
-
-
-## Identifying the Markers of each cluster
-
-```{r}
-## List of known markers
-huCortex_celltype_markers <- list(
-  Ex=c("SLC17A7", "CAMK2A","CHN1","SV2B","NRGN"),
-  In=c("GAD1", "GAD2", "SLC32A1"),
-  Ast=c("GFAP", "AQP4", "SLC4A4"),
-  Oli=c("PLP1", "MBP", "MOBP", "MOG"),
-  Mic=c("CSF1R", "CD74", "P2RY12"),
-  Opc=c("OLIG1", "OLIG2", "PDGFRA", "SOX10", "APOD"),
-  Endo=c("ATP10A", "CLDN5", "FLT1", "VWF"),
-  Per=c("PTH1R", "SLC6A12", "SLC19A1", "COLEC12", "SLC12A7")
-)
-
-## Find the markers within cluster
-# find markers for every cluster compared to all remaining cells, report only the positive
-# ones
-srat.markers <- FindAllMarkers(srat, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
-srat.markers %>%
-    group_by(cluster) %>%
-    slice_max(n = 3, order_by = avg_log2FC)
-
-```
-markers based on atlas https://www.proteinatlas.org/ 
-
-cluster 1 -> NRN1 endothelial, DDIT4 	T-cells - Immune response
-cluster 2 -> NTS 	Endocrine cells, 
-            LMO3 (Alveolar cells type 1, Astrocytes, Alveolar cells type 2, Excitatory neurons, Oligodendrocyte precursor cells), RUNX1T1 Inhibitory neurons, Oligodendrocyte precursor cells, Excitatory neurons, Bipolar cells, Microglial cells
-cluster 3 -> BHLHE22 Horizontal cells, Bipolar cells; 
-              BCL11A dendritic cells, B-cells, Excitatory neurons, Langerhans cells, Basal squamous epithelial cells,               Squamous epithelial cells, Inhibitory neurons; 
-              STMN2 Excitatory neurons, Horizontal cells, Inhibitory neurons
-cluster 4 -> PTN Endometrial stromal cells, Extravillous trophoblasts, Muller glia cells, Squamous epithelial cells;
-            FABP7 Muller glia cells;
-            TTYH1 Muller glia cells
-Cluster 5 -> Muller glia cells, Late spermatids, Excitatory neurons;
-            NHLH1 Oligodendrocytes
-            EOMES Intermediate progenitor cells
-cluster 6 -> LMO3 Alveolar cells type 1, Astrocytes, Alveolar cells type 2, Excitatory neurons, Oligodendrocyte precursor cells;
-            GPR22 Inhibitory neurons, Excitatory neurons;
-            GRIA2 Excitatory neurons, Oligodendrocyte precursor cells, Inhibitory neurons, Astrocytes, Oligodendrocytes, Horizontal cells
-cluster 7 -> TOP2A Cell cycle regulation;
-            CENPF Cell cycle regulation;
-            HIST1H4C Cell proliferation
-cluster 8 -> CENPF Cell proliferation ;
-            PTTG1 Langerhans cells, Spermatocytes;
-            KPNA2 Spermatocytes, Cell cycle regulation
-cluster 9 -> CRYAB Schwann cells;
-            FTL Macrophages;
-            HSPA1A Langerhans cells
-cluster 10 -> TTR and CLU hepatocytes; 
-          CRYAB schwann cells
-cluster 11 -> Fibroblasts
-
-```{r}
-## Visualize the expression of some markers
-
-FeaturePlot(srat, features = c("SLC17A7", "NRN1", "IGFBP5", "STMN2", "THRA"))
-
-VlnPlot(srat, features = c("SLC17A7", "GAD1", "GFAP", "PLP1", "THRA"))
-
-
-```
-```{r}
-## Excitatory neurons
-VlnPlot(srat, features = c("SLC17A7", "CAMK2A","CHN1","SV2B","NRGN"))
-FeaturePlot(srat, features = c("SLC17A7", "CAMK2A","CHN1","SV2B","NRGN"))
-```
-
-```{r}
-## Inhibitory neurons
-VlnPlot(srat, features = c("GAD1", "GAD2", "SLC32A1"))
-FeaturePlot(srat, features = c("GAD1", "GAD2", "SLC32A1"))
-```
-
-```{r}
-## Astrocytes
-VlnPlot(srat, features = c("GFAP", "AQP4", "SLC4A4"))
-FeaturePlot(srat, features = c("GFAP", "AQP4", "SLC4A4"))
-```
-```{r}
-## Radial Glia 
-VlnPlot(srat, features = c("VIM"))
-FeaturePlot(srat, features = c("VIM"))
-```
-```{r}
-## Outer Radial Glia 
-VlnPlot(srat, features = c("HOPX"))
-FeaturePlot(srat, features = c("HOPX"))
-```
-```{r}
-## Intermediate progenitor cells
-VlnPlot(srat, features = c("EOMES"))
-FeaturePlot(srat, features = c("EOMES"))
-```
-
-
-```{r}
-## Neurons
-VlnPlot(srat, features = c("STMN2"))
-FeaturePlot(srat, features = c("STMN2"))
-```
-
-```{r}
-## Fibroblasts
-VlnPlot(srat, features = c("COL3A1"))
-FeaturePlot(srat, features = c("COL3A1"))
-```
-
-
-```{r}
-## Visualize heatmap of all the markers (max 20) per cluster
-srat.markers %>%
-    group_by(cluster) %>%
-    top_n(n = 10, wt = avg_log2FC) -> top10
-DoHeatmap(srat, features = top10$gene) + NoLegend()
-```
-
-## Add new labels
-```{r}
-new.cluster.ids <- c("Naive CD4 T", "CD14+ Mono", "Memory CD4 T", "B", "CD8 T", "FCGR3A+ Mono",
-    "NK", "DC", "Platelet")
-names(new.cluster.ids) <- levels(srat)
-srat <- RenameIdents(srat, new.cluster.ids)
-DimPlot(srat, reduction = "umap", label = TRUE, pt.size = 0.5) + NoLegend()
-```
 
 
 
