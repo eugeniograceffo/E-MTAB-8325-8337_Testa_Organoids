@@ -488,9 +488,16 @@ huCortex_celltype_markers <- list(
 ## Find the markers within cluster
 # find markers for every cluster compared to all remaining cells, report only the positive ones
 srat.markers <- FindAllMarkers(harmonized_seurat, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
-srat.markers %>%
+
+marker_list_top10 <- srat.markers %>%
     group_by(cluster) %>%
-    slice_max(n = 3, order_by = avg_log2FC)
+    slice_max(n = 8, order_by = avg_log2FC) %>%
+  select(cluster, gene)
+
+
+write.table(marker_list_top10, file = "markers.txt", sep = "\t",
+            row.names = TRUE, col.names = TRUE)
+
 
 ```
 markers based on atlas https://www.proteinatlas.org/ 
@@ -631,6 +638,14 @@ FeaturePlot(harmonized_seurat, features = c("SATB2", "POU3F2"))
 ```
 
 ```{r}
+## Microglia
+VlnPlot(harmonized_seurat, features = c("CX3CR1", "P2RY12"))
+FeaturePlot(harmonized_seurat, features = c("CX3CR1", "P2RY12"))
+
+```
+
+
+```{r}
 ## Visualize heatmap of all the markers (max 20) per cluster
 srat.markers %>%
     group_by(cluster) %>%
@@ -646,6 +661,62 @@ names(new.cluster.ids) <- levels(srat)
 srat <- RenameIdents(srat, new.cluster.ids)
 DimPlot(srat, reduction = "umap", label = TRUE, pt.size = 0.5) + NoLegend()
 ```
+
+
+
+
+
+
+
+
+# intergartion based only on sample ID
+```{r}
+# Run Harmony to remove batch effects and integrate the datasets
+merged_sample_regressed <- RunHarmony(object = merged_seurat, group.by.vars = c("Sample"), covariates.use = "Timepoint", n.harmonies = 20, reduction = "pca", assay.use = "SCT")
+
+## harmonized dataset
+merged_sample_regressed <- RunUMAP(merged_sample_regressed, reduction = "harmony", assay = "SCT", dims = 1:50)
+merged_sample_regressed <- FindNeighbors(object = merged_sample_regressed, reduction = "harmony")
+merged_sample_regressed <- FindClusters(merged_sample_regressed, resolution = 0.55)
+
+## Save the integrated Seurat object
+saveRDS(merged_sample_regressed, "/home/data/Testa_organoids_scRNA/Seurat_code/outputs/merged_dataset_harmonized_only_Sample.rds")
+```
+
+## Plot the two datasets to visualize the difference
+
+```{r}
+DimPlot(merged_seurat, reduction="umap", group.by = "Timepoint")
+DimPlot(merged_sample_regressed, reduction="umap", group.by = "Timepoint")
+
+DimPlot(merged_seurat, reduction="umap", group.by = "Sample")
+DimPlot(merged_sample_regressed, reduction="umap", group.by = "Sample")
+```
+
+
+
+```{r}
+FeaturePlot(merged_sample_regressed, features = c("DCX"))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
