@@ -779,6 +779,76 @@ FeaturePlot(merged_seurat_integrated, features = c("DCX", "TACC3", "HES1"))
 saveRDS(merged_seurat_integrated, "/home/data/Testa_organoids_scRNA/Seurat_code/outputs/merged_dataset_integrated_with_Seurat_SCT_Pearson.rds")
 ```
 
+## Anotate Clusters
+```{r}
+## Find the markers within cluster
+# first prepare the merged and integrated object for DE analysis (this normalizes the SCT counts across samples)
+merged_seurat_integrated <- PrepSCTFindMarkers(merged_seurat_integrated)
+
+## Save the integrated Seurat object
+saveRDS(merged_seurat_integrated, "/home/data/Testa_organoids_scRNA/Seurat_code/outputs/merged_dataset_integrated_with_Seurat_SCT_Pearson_Ready_Markers.rds")
+
+# change default assay. SCT is used when looking at gene expression
+DefaultAssay(merged_seurat_integrated) <- "SCT"
+
+# find markers for every cluster compared to all remaining cells, report only the positive ones
+
+merged_seurat_integrated.markers <- FindAllMarkers(merged_seurat_integrated, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25, assay = "SCT")
+
+marker_list_top10 <- merged_seurat_integrated.markers %>%
+    group_by(cluster) %>%
+    slice_max(n = 10, order_by = avg_log2FC) %>%
+  select(cluster, gene)
+
+marker_list_top10
+
+write.table(marker_list_top10, file = "markers_merged_Seurat.txt", sep = "\t",
+            row.names = FALSE, col.names = TRUE)
+```
+0	PLCG2			-> microglial cells; glial cells
+0	HSP90AA1			-> glial cells (Muller and Schwann)
+0	MDM2    -> oligodendrocytes
+
+
+```{r}
+## Outer Radial Glia (cluster 4)
+VlnPlot(merged_seurat_integrated, features = c("FAM107A"))
+FeaturePlot(merged_seurat_integrated, features = c("FAM107A"))
+```
+```{r}
+## Proliferating RG (cluster 8)
+VlnPlot(merged_seurat_integrated, features = c("TACC3"))
+FeaturePlot(merged_seurat_integrated, features = c("TACC3"))
+```
+
+```{r}
+## Choroid (subcluster of cluster 4)
+VlnPlot(merged_seurat_integrated, features = c("TTR"))
+FeaturePlot(merged_seurat_integrated, features = c("TTR"))
+```
+```{r}
+## Interneurons (cluster 4)
+VlnPlot(merged_seurat_integrated, features = c("SST", "PVALB"))
+FeaturePlot(merged_seurat_integrated, features = c("SST", "PVALB"))
+```
+
+```{r}
+## Interneurons (cluster 4)
+VlnPlot(merged_seurat_integrated, features = c("THRA2"))
+FeaturePlot(merged_seurat_integrated, features = c( "THRA2"))
+```
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
