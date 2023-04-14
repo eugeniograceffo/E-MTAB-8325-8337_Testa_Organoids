@@ -394,9 +394,6 @@ saveRDS(merged_seurat, "/home/data/Testa_organoids_scRNA/Seurat_code/outputs/mer
 
 ```{r}
 merged_seurat <- merged_seurat %>%
-    NormalizeData() %>%
-    FindVariableFeatures(selection.method = "vst", nfeatures = 2000) %>% 
-    ScaleData() %>%
     SCTransform(vars.to.regress = c("percent.mt"))
 
 # Calculate PCs using variable features determined by SCTransform (3000 by default)
@@ -708,7 +705,7 @@ FeaturePlot(merged_sample_regressed, features = c("DCX"))
 merged_seurat_integrated<- readRDS ("/home/data/Testa_organoids_scRNA/Seurat_code/outputs/merged_dataset_raw.rds")
 ```
 
-## Do normalization separately for each dataset
+## Do normalization separately for each dataset (https://satijalab.org/seurat/articles/sctransform_v2_vignette.html)
 
 ```{r}
 # split the dataset into a list of 7 seurat objects (sample names)
@@ -716,30 +713,28 @@ merged_seurat_integrated.list <- SplitObject(merged_seurat_integrated, split.by 
 
 # normalize and identify variable features for each dataset independently
 merged_seurat_integrated.list <- lapply(X = merged_seurat_integrated.list, FUN = function(x) {
-    x <- NormalizeData(x)
-    x <- FindVariableFeatures(x, selection.method = "vst", nfeatures = 2000)
+    x <- SCTransform(x, vars.to.regress = c("percent.mt"))
+    x <- RunPCA(x, npcs = 30, verbose = FALSE)
 })
 
-# select features that are repeatedly variable across datasets for integration run PCA on each dataset using these features
+# select features and prepare fo integration
 features <- SelectIntegrationFeatures(object.list = merged_seurat_integrated.list, nfeatures = 3000)
-merged_seurat_integrated.list <- lapply(X = merged_seurat_integrated.list, FUN = function(x) {
-    x <- ScaleData(x, features = features, verbose = FALSE)
-    x <- RunPCA(x, features = features, verbose = FALSE)
-})
+merged_seurat_integrated.list <- PrepSCTIntegration(object.list = merged_seurat_integrated.list, anchor.features = features)
+
 ```
 
 ## find anchors and integrate
 ```{r}
-anchors <- FindIntegrationAnchors(object.list = merged_seurat_integrated.list, anchor.features = features , reduction = "rpca",
-    dims = 1:40)
-merged_seurat_integrated <- IntegrateData(anchorset = anchors, dims = 1:40)
+anchors <- FindIntegrationAnchors(object.list = merged_seurat_integrated.list, normalization.method = "SCT" , anchor.features = features)
+merged_seurat_integrated <- IntegrateData(anchorset = anchors, normalization.method = "SCT" , dims = 1:40)
 ```
 ## Run the standard workflow for visualization
 ```{r}
+## The integrated dataset vill store the values in the "integrated" assay
 DefaultAssay(merged_seurat_integrated) <- "integrated"
-merged_seurat_integrated <- ScaleData(merged_seurat_integrated, verbose = FALSE)
+
 merged_seurat_integrated <- RunPCA(merged_seurat_integrated, verbose = FALSE)
-merged_seurat_integrated <- RunUMAP(merged_seurat_integrated, dims = 1:50)
+merged_seurat_integrated <- RunUMAP(merged_seurat_integrated, reduction = "pca", dims = 1:50)
 ```
 ```{r}
 ## Save the integrated Seurat object
@@ -762,7 +757,7 @@ DimPlot(merged_seurat_integrated, reduction="umap", group.by = "Sample")
 ## Find clusters
 ```{r}
 merged_seurat_integrated <- FindNeighbors(object = merged_seurat_integrated, reduction = "pca")
-merged_seurat_integrated <- FindClusters(merged_seurat_integrated, resolution = 0.42)
+merged_seurat_integrated <- FindClusters(merged_seurat_integrated, resolution = 0.5)
 
 table(merged_seurat_integrated@meta.data$seurat_clusters)  #shows the size of each cluster
 ```
@@ -775,11 +770,14 @@ DimPlot(merged_seurat_integrated,label.size = 4,repel = T,label = T)
 ```
 
 ```{r}
-FeaturePlot(merged_seurat_integrated, features = c("DCX"))
+FeaturePlot(merged_seurat_integrated, features = c("DCX", "TACC3", "HES1"))
 ```
 
 
-
+```{r}
+## Save the integrated Seurat object
+saveRDS(merged_seurat_integrated, "/home/data/Testa_organoids_scRNA/Seurat_code/outputs/merged_dataset_integrated_with_Seurat_SCT_Pearson.rds")
+```
 
 
 
