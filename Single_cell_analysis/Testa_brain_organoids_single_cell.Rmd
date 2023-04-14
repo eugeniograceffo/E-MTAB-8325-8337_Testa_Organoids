@@ -701,7 +701,82 @@ FeaturePlot(merged_sample_regressed, features = c("DCX"))
 
 
 
+# Data integration using Seurat
 
+```{r}
+## Load the merged Seurat object after QC filtering but BEFORE normalization
+merged_seurat_integrated<- readRDS ("/home/data/Testa_organoids_scRNA/Seurat_code/outputs/merged_dataset_raw.rds")
+```
+
+## Do normalization separately for each dataset
+
+```{r}
+# split the dataset into a list of 7 seurat objects (sample names)
+merged_seurat_integrated.list <- SplitObject(merged_seurat_integrated, split.by = "Sample")
+
+# normalize and identify variable features for each dataset independently
+merged_seurat_integrated.list <- lapply(X = merged_seurat_integrated.list, FUN = function(x) {
+    x <- NormalizeData(x)
+    x <- FindVariableFeatures(x, selection.method = "vst", nfeatures = 2000)
+})
+
+# select features that are repeatedly variable across datasets for integration run PCA on each dataset using these features
+features <- SelectIntegrationFeatures(object.list = merged_seurat_integrated.list, nfeatures = 3000)
+merged_seurat_integrated.list <- lapply(X = merged_seurat_integrated.list, FUN = function(x) {
+    x <- ScaleData(x, features = features, verbose = FALSE)
+    x <- RunPCA(x, features = features, verbose = FALSE)
+})
+```
+
+## find anchors and integrate
+```{r}
+anchors <- FindIntegrationAnchors(object.list = merged_seurat_integrated.list, anchor.features = features , reduction = "rpca",
+    dims = 1:40)
+merged_seurat_integrated <- IntegrateData(anchorset = anchors, dims = 1:40)
+```
+## Run the standard workflow for visualization
+```{r}
+DefaultAssay(merged_seurat_integrated) <- "integrated"
+merged_seurat_integrated <- ScaleData(merged_seurat_integrated, verbose = FALSE)
+merged_seurat_integrated <- RunPCA(merged_seurat_integrated, verbose = FALSE)
+merged_seurat_integrated <- RunUMAP(merged_seurat_integrated, dims = 1:50)
+```
+```{r}
+## Save the integrated Seurat object
+saveRDS(merged_seurat_integrated, "/home/data/Testa_organoids_scRNA/Seurat_code/outputs/merged_dataset_integrated_with_Seurat.rds")
+```
+
+
+## Plot the 3 datasets to visualize the difference
+
+```{r}
+DimPlot(merged_seurat, reduction="umap", group.by = "Timepoint")
+DimPlot(harmonized_seurat, reduction="umap", group.by = "Timepoint")
+DimPlot(merged_seurat_integrated, reduction="umap", group.by = "Timepoint")
+
+DimPlot(merged_seurat, reduction="umap", group.by = "Sample")
+DimPlot(harmonized_seurat, reduction="umap", group.by = "Sample")
+DimPlot(merged_seurat_integrated, reduction="umap", group.by = "Sample")
+```
+
+## Find clusters
+```{r}
+merged_seurat_integrated <- FindNeighbors(object = merged_seurat_integrated, reduction = "pca")
+merged_seurat_integrated <- FindClusters(merged_seurat_integrated, resolution = 0.42)
+
+table(merged_seurat_integrated@meta.data$seurat_clusters)  #shows the size of each cluster
+```
+
+## Let's plot the clusters
+```{r}
+DimPlot(merged_seurat,label.size = 4,repel = T,label = T)
+DimPlot(harmonized_seurat,label.size = 4,repel = T,label = T)
+DimPlot(merged_seurat_integrated,label.size = 4,repel = T,label = T)
+```
+
+```{r}
+FeaturePlot(merged_seurat_integrated, features = c("DCX"))
+```
 
 
 
