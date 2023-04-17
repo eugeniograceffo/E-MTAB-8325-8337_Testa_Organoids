@@ -809,6 +809,12 @@ write.table(marker_list_top10, file = "markers_merged_Seurat.txt", sep = "\t",
 0	HSP90AA1			-> glial cells (Muller and Schwann)
 0	MDM2    -> oligodendrocytes
 
+```{r}
+## Neurons (cluster 1, 5, 7, 10, 11, 13)
+VlnPlot(merged_seurat_integrated, features = c("DCX"))
+FeaturePlot(merged_seurat_integrated, features = c("DCX"))
+```
+
 
 ```{r}
 ## Outer Radial Glia (cluster 4)
@@ -833,10 +839,147 @@ FeaturePlot(merged_seurat_integrated, features = c("SST", "PVALB"))
 ```
 
 ```{r}
-## Interneurons (cluster 4)
-VlnPlot(merged_seurat_integrated, features = c("THRA2"))
-FeaturePlot(merged_seurat_integrated, features = c( "THRA2"))
+## Interneurons (cluster 7)
+VlnPlot(merged_seurat_integrated, features = c("ANK3", "NOVA1"))
+FeaturePlot(merged_seurat_integrated, features = c( "ANK3", "NOVA1"))
+
 ```
+```{r}
+## Neurons abundant in ribosome (cluster 10)
+VlnPlot(merged_seurat_integrated, features = c("RPS29", "RPL18A"))
+FeaturePlot(merged_seurat_integrated, features = c( "RPS29", "RPL18A"))
+
+```
+
+```{r}
+## Neural Progenitor Cells NPCs (cluster 12 and 13)
+VlnPlot(merged_seurat_integrated, features = c("NES", "SOX2", "FGFR1"))
+FeaturePlot(merged_seurat_integrated, features = c("NES", "SOX2", "FGFR1"))
+
+```
+
+```{r}
+## Oligodendrocyte Precursor Cells (cluster 14)
+VlnPlot(merged_seurat_integrated, features = c("SOX10", "OLIG1", "OLIG2", "MBP"))
+FeaturePlot(merged_seurat_integrated, features = c("SOX10", "OLIG1", "OLIG2", "MBP"))
+
+```
+```{r}
+## Astrocytes markers (cluster x)
+VlnPlot(merged_seurat_integrated, features = c("GFAP", "SLC1A3", "ATP1B2", "SLC1A2"))
+FeaturePlot(merged_seurat_integrated, features = c("GFAP", "SLC1A3", "ATP1B2", "SLC1A2"))
+
+```
+```{r}
+## Radial Glia (cluster 3 and 4)
+VlnPlot(merged_seurat_integrated, features = c("VIM", "EDNRB", "SOX3", "ZFP36L1")) 
+FeaturePlot(merged_seurat_integrated, features = c("VIM", "EDNRB", "SOX3", "ZFP36L1")) 
+```
+
+
+
+
+
+
+
+## Let's subset the dataset with neuronal clusters to identify markers specific for each population.
+
+```{r}
+# create a subset
+subset_neuronal_clusters <- subset(merged_seurat_integrated, idents = c("5", "7", "1", "10", "13", "11"))
+
+# find markers within subset
+subset_neuronal_clusters.markers <- FindAllMarkers(
+  object = subset_neuronal_clusters,
+  min.pct = 0.25,
+  logfc.threshold = 0.25,
+  assay = "SCT",
+  only.pos = TRUE ,
+  recorrect_umi = FALSE
+)
+
+#filter
+
+subset_neuronal_clusters.markers.filtered <- subset_neuronal_clusters.markers %>%
+    group_by(cluster) %>%
+    slice_max(n = 20, order_by = avg_log2FC) %>%
+  select(cluster, gene)
+
+subset_neuronal_clusters.markers.filtered
+
+#save
+write.table(subset_neuronal_clusters.markers.filtered, file = "neuronal_clusters_markers.txt", sep = "\t",
+            row.names = FALSE, col.names = TRUE)
+
+```
+
+
+## Cluster 12 and 13 are both Neural Progenitors. Let's subset them and run a DE
+
+```{r}
+# create a subset
+cluster_12_vs_13 <- subset(merged_seurat_integrated, idents = c("12", "13"))
+
+# find markers within subset
+cluster_12_vs_13.markers <- FindAllMarkers(
+  object = cluster_12_vs_13,
+  min.pct = 0.25,
+  logfc.threshold = 0.25,
+  assay = "SCT",
+  only.pos = TRUE ,
+  recorrect_umi = FALSE
+)
+
+#filter
+
+cluster_12_vs_13.markers.filtered <- cluster_12_vs_13.markers %>%
+    group_by(cluster) %>%
+    slice_max(n = 20, order_by = avg_log2FC) %>%
+  select(cluster, gene)
+
+cluster_12_vs_13.markers.filtered
+
+#save
+write.table(cluster_12_vs_13.markers.filtered, file = "NPCs_clusters_markers.txt", sep = "\t",
+            row.names = FALSE, col.names = TRUE)
+
+```
+
+
+
+## Let's subset the remaining unknown clusters (0, 9, 2, 6) to identify markers specific for each population.
+
+```{r}
+# create a subset
+subset_remaining_clusters <- subset(merged_seurat_integrated, idents = c("0", "9", "2", "6"))
+
+# find markers within subset
+subset_remaining_clusters.markers <- FindAllMarkers(
+  object = subset_remaining_clusters,
+  min.pct = 0.25,
+  logfc.threshold = 0.25,
+  assay = "SCT",
+  only.pos = TRUE ,
+  recorrect_umi = FALSE
+)
+
+#filter
+
+subset_remaining_clusters.markers.filtered <- subset_remaining_clusters.markers %>%
+    group_by(cluster) %>%
+    slice_max(n = 20, order_by = avg_log2FC) %>%
+  select(cluster, gene)
+
+subset_remaining_clusters.markers.filtered
+
+#save
+write.table(subset_remaining_clusters.markers.filtered, file = "remaining_clusters_markers.txt", sep = "\t",
+            row.names = FALSE, col.names = TRUE)
+
+```
+
+
+
 
 
 
