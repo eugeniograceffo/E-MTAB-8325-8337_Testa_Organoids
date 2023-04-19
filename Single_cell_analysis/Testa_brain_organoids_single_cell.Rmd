@@ -601,8 +601,8 @@ FeaturePlot(harmonized_seurat, features = c("AURKA", "UBEC2C", "TACC3"))
 
 ```{r}
 ## Outer Radial Glia 
-VlnPlot(harmonized_seurat, features = c("HOPX"))
-FeaturePlot(harmonized_seurat, features = c("HOPX"))
+VlnPlot(harmonized_seurat, features = c("HOPX", "PTPRZ1", "FAM107A"))
+FeaturePlot(harmonized_seurat, features = c("HOPX", "PTPRZ1", "FAM107A"))
 ```
 ```{r}
 ## Choroid 
@@ -788,6 +788,9 @@ merged_seurat_integrated <- PrepSCTFindMarkers(merged_seurat_integrated)
 ## Save the integrated Seurat object
 saveRDS(merged_seurat_integrated, "/home/data/Testa_organoids_scRNA/Seurat_code/outputs/merged_dataset_integrated_with_Seurat_SCT_Pearson_Ready_Markers.rds")
 
+## load the integrated Seurat object
+merged_seurat_integrated <- readRDS("/home/data/Testa_organoids_scRNA/Seurat_code/outputs/merged_dataset_integrated_with_Seurat_SCT_Pearson_Ready_Markers.rds")
+
 # change default assay. SCT is used when looking at gene expression
 DefaultAssay(merged_seurat_integrated) <- "SCT"
 
@@ -797,7 +800,7 @@ merged_seurat_integrated.markers <- FindAllMarkers(merged_seurat_integrated, onl
 
 marker_list_top10 <- merged_seurat_integrated.markers %>%
     group_by(cluster) %>%
-    slice_max(n = 10, order_by = avg_log2FC) %>%
+    slice_max(n = 25, order_by = avg_log2FC) %>%
   select(cluster, gene)
 
 marker_list_top10
@@ -808,6 +811,13 @@ write.table(marker_list_top10, file = "markers_merged_Seurat.txt", sep = "\t",
 0	PLCG2			-> microglial cells; glial cells
 0	HSP90AA1			-> glial cells (Muller and Schwann)
 0	MDM2    -> oligodendrocytes
+0	H3F3B		-> microglial cells; glial cells	
+0	POLR2A		-> glial cells (Muller and Schwann)	
+0	CCDC144NL-AS1			
+0	RBM39			-> Glial cells
+0	KMT2E			
+0	NOP58			
+0	USP15
 
 ```{r}
 ## Neurons (cluster 1, 5, 7, 10, 11, 13)
@@ -815,17 +825,34 @@ VlnPlot(merged_seurat_integrated, features = c("DCX"))
 FeaturePlot(merged_seurat_integrated, features = c("DCX"))
 ```
 
+```{r}
+## Excitatory Neurons (cluster 1 and 7)
+VlnPlot(merged_seurat_integrated, features = c("NEUROD2"))
+FeaturePlot(merged_seurat_integrated, features = c("NEUROD2"))
+```
+
 
 ```{r}
 ## Outer Radial Glia (cluster 4)
-VlnPlot(merged_seurat_integrated, features = c("FAM107A"))
-FeaturePlot(merged_seurat_integrated, features = c("FAM107A"))
+VlnPlot(merged_seurat_integrated, features = c("HOPX", "PTPRZ1", "FAM107A"))
+FeaturePlot(merged_seurat_integrated, features = c("HOPX", "PTPRZ1", "FAM107A"))
 ```
 ```{r}
 ## Proliferating RG (cluster 8)
 VlnPlot(merged_seurat_integrated, features = c("TACC3"))
 FeaturePlot(merged_seurat_integrated, features = c("TACC3"))
 ```
+```{r}
+## Intermediate progenitor cells
+VlnPlot(merged_seurat_integrated, features = c("EOMES", "RBFOX1", "SOX4", "HOPX"))
+FeaturePlot(merged_seurat_integrated, features = c("EOMES", "RBFOX1", "SOX4", "HOPX"))
+```
+```{r}
+## Microglia (cluster x)
+VlnPlot(merged_seurat_integrated, features = c("AIF1"))
+FeaturePlot(merged_seurat_integrated, features = c("AIF1"))
+```
+
 
 ```{r}
 ## Choroid (subcluster of cluster 4)
@@ -833,15 +860,15 @@ VlnPlot(merged_seurat_integrated, features = c("TTR"))
 FeaturePlot(merged_seurat_integrated, features = c("TTR"))
 ```
 ```{r}
-## Interneurons (cluster 4)
+## Interneurons (cluster 7)
 VlnPlot(merged_seurat_integrated, features = c("SST", "PVALB"))
 FeaturePlot(merged_seurat_integrated, features = c("SST", "PVALB"))
 ```
 
 ```{r}
 ## Interneurons (cluster 7)
-VlnPlot(merged_seurat_integrated, features = c("ANK3", "NOVA1"))
-FeaturePlot(merged_seurat_integrated, features = c( "ANK3", "NOVA1"))
+VlnPlot(merged_seurat_integrated, features = c("ANK3", "NOVA1", "GAD1"))
+FeaturePlot(merged_seurat_integrated, features = c("ANK3", "NOVA1", "GAD1"))
 
 ```
 ```{r}
@@ -860,22 +887,33 @@ FeaturePlot(merged_seurat_integrated, features = c("NES", "SOX2", "FGFR1"))
 
 ```{r}
 ## Oligodendrocyte Precursor Cells (cluster 14)
-VlnPlot(merged_seurat_integrated, features = c("SOX10", "OLIG1", "OLIG2", "MBP"))
-FeaturePlot(merged_seurat_integrated, features = c("SOX10", "OLIG1", "OLIG2", "MBP"))
+VlnPlot(merged_seurat_integrated, features = c("SOX10", "OLIG1", "PCDH15", "MBP", "PDGFRA", "PTPRZ1"))
+FeaturePlot(merged_seurat_integrated, features = c("SOX10", "OLIG1", "PCDH15", "MBP", "PDGFRA", "PTPRZ1"))
 
 ```
+
+```{r}
+## Oligodendrocyte markers (cluster x)
+VlnPlot(merged_seurat_integrated, features = c("MOG", "MAG", "PLP1", "MOBP", "MBP", "PDGFRA"))
+FeaturePlot(merged_seurat_integrated, features = c("MOG", "MAG", "PLP1", "MOBP", "MBP", "PDGFRA"))
+
+```
+
+
+
+
+
 ```{r}
 ## Astrocytes markers (cluster x)
-VlnPlot(merged_seurat_integrated, features = c("GFAP", "SLC1A3", "ATP1B2", "SLC1A2"))
-FeaturePlot(merged_seurat_integrated, features = c("GFAP", "SLC1A3", "ATP1B2", "SLC1A2"))
+VlnPlot(merged_seurat_integrated, features = c("GFAP", "SLC1A3", "AQP4", "SLC1A2", "ALDH1L1", "GJA1"))
+FeaturePlot(merged_seurat_integrated, features = c("GFAP", "SLC1A3", "AQP4", "SLC1A2", "ALDH1L1", "GJA1"))
 
 ```
 ```{r}
 ## Radial Glia (cluster 3 and 4)
-VlnPlot(merged_seurat_integrated, features = c("VIM", "EDNRB", "SOX3", "ZFP36L1")) 
-FeaturePlot(merged_seurat_integrated, features = c("VIM", "EDNRB", "SOX3", "ZFP36L1")) 
+VlnPlot(merged_seurat_integrated, features = c("VIM", "EDNRB", "SOX3", "ZFP36L1", "HES1", "ATP1A2")) 
+FeaturePlot(merged_seurat_integrated, features = c("VIM", "EDNRB", "SOX3", "ZFP36L1", "HES1", "ATP1A2")) 
 ```
-
 
 
 
@@ -977,6 +1015,135 @@ write.table(subset_remaining_clusters.markers.filtered, file = "remaining_cluste
             row.names = FALSE, col.names = TRUE)
 
 ```
+## Let's subset cluster 4 and identify the different subpopulations
+```{r}
+# create a subset
+cluster_4 <- subset(merged_seurat_integrated, idents = c("4"))
+
+
+# Find clusters
+DefaultAssay(cluster_4) <- "integrated"
+cluster_4 <- FindNeighbors(object = cluster_4, reduction = "pca")
+cluster_4 <- FindClusters(cluster_4, resolution = 0.2)
+
+table(cluster_4@meta.data$seurat_clusters)  #shows the size of each cluster
+
+DimPlot(cluster_4, reduction="umap", group.by = "Timepoint")
+DimPlot(cluster_4, reduction="umap", group.by = "Sample")
+DimPlot(cluster_4,label.size = 4,repel = T,label = T)
+```
+
+```{r}
+
+
+# find markers within subset
+cluster_4.markers <- FindAllMarkers(
+  object = cluster_4,
+  min.pct = 0.25,
+  logfc.threshold = 0.25,
+  assay = "SCT",
+  only.pos = TRUE ,
+  recorrect_umi = FALSE
+)
+
+#filter
+
+cluster_4.markers.filtered <- cluster_4.markers %>%
+    group_by(cluster) %>%
+    slice_max(n = 20, order_by = avg_log2FC) %>%
+  select(cluster, gene)
+
+cluster_4.markers.filtered
+
+#save
+write.table(cluster_4.markers.filtered, file = "Cluster_4_subclusters_markers.txt", sep = "\t",
+            row.names = FALSE, col.names = TRUE)
+
+```
+
+```{r}
+DefaultAssay(cluster_4) <- "SCT"
+## Astrocytes markers (cluster 2)
+VlnPlot(cluster_4, features = c("APOE"))
+FeaturePlot(cluster_4, features = c("APOE"))
+
+```
+```{r}
+## Choroid (subcluster of cluster 1)
+VlnPlot(cluster_4, features = c("TTR"))
+FeaturePlot(cluster_4, features = c("TTR"))
+```
+
+```{r}
+## Outer Radial Glia (cluster 4)
+VlnPlot(cluster_4, features = c("HOPX", "PTPRZ1", "FAM107A"))
+FeaturePlot(cluster_4, features = c("HOPX", "PTPRZ1", "FAM107A"))
+```
+## Let's subset again cluster 4 to identify choroid plexus cells (TTR+)
+```{r}
+# create a subset
+cluster_4_1 <- subset(cluster_4, idents = c("1"))
+
+
+# Find clusters
+DefaultAssay(cluster_4_1) <- "integrated"
+cluster_4_1 <- FindNeighbors(object = cluster_4_1, reduction = "pca")
+cluster_4_1 <- FindClusters(cluster_4_1, resolution = 0.2)
+
+
+DimPlot(cluster_4_1, reduction="umap", group.by = "Timepoint")
+DimPlot(cluster_4_1, reduction="umap", group.by = "Sample")
+DimPlot(cluster_4_1,label.size = 4,repel = T,label = T)
+```
+```{r}
+DefaultAssay(cluster_4_1) <- "SCT"
+## Choroid (subcluster of cluster 1)
+VlnPlot(cluster_4_1, features = c("TTR"))
+FeaturePlot(cluster_4_1, features = c("TTR"))
+DimPlot(cluster_4_1,label.size = 4,repel = T,label = T) + NoLegend()
+
+```
+
+## Finally we can assign the names of the clusters
+```{r}
+## Assign names in the subsubclusters of cluster 1
+new.cluster.ids <- c("1", "Choroid Plexus cells", "1")
+names(new.cluster.ids) <- levels(cluster_4_1)
+cluster_4_1 <- RenameIdents(cluster_4_1, new.cluster.ids)
+DimPlot(cluster_4_1, reduction = "umap", label = TRUE, pt.size = 0.5) + NoLegend()
+```
+```{r}
+## project those identities back to subclusters of cluster 4
+
+# Get the indices of cells that are present in both the original Seurat object and the subseurat object
+indices <- match(rownames(cluster_4_1@meta.data), rownames(cluster_4@meta.data))
+
+# Assign the subcluster identities to the corresponding cells in the original Seurat object
+cluster_4$subclusters_1 <- as.character(Idents(cluster_4))
+
+cluster_4@meta.data$subclusters_1[indices] <- as.character(Idents(cluster_4_1))
+
+
+# Visualize the subclusters in the original Seurat object
+DimPlot(cluster_4, reduction = "umap", group.by = "subclusters_1")
+DimPlot(cluster_4, reduction = "umap")
+
+
+Idents(cluster_4) <- "subclusters_1"
+Idents(cluster_4) <- "integrated_snn_res.0.2"
+VlnPlot(cluster_4, features = c("TTR"))
+FeaturePlot(cluster_4, features = c("TTR"))
+```
+
+
+
+
+
+
+
+
+
+
 
 
 
