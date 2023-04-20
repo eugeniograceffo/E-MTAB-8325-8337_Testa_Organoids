@@ -20,6 +20,9 @@ library(SingleCellExperiment)
 library(tidyverse)
 library(sctransform)
 #library(Matrix.utils)
+
+## Set paths
+path_plots = "/home/data/Testa_organoids_scRNA/Seurat_code/outputs/figures"
 ```
 
 # Loading all the datasets separately and performing QC filtering
@@ -1173,7 +1176,11 @@ new.cluster.ids <- c("Glial cells", "RG - enriched ribosomes", "OPCs-1", "OPCs-2
 names(new.cluster.ids) <- levels(merged_seurat_integrated)
 merged_seurat_integrated <- RenameIdents(merged_seurat_integrated, new.cluster.ids)
 merged_seurat_integrated$cluster_names_final <- as.character(Idents(merged_seurat_integrated))
-DimPlot(merged_seurat_integrated, reduction = "umap", label = TRUE, pt.size = 0.5) + NoLegend()
+DimPlot(merged_seurat_integrated, reduction = "umap", label = TRUE, repel = TRUE, pt.size = 0.5) + theme(legend.text = element_text(size = 8))
+
+## save plot
+ggsave("UMAP_clusters.png" , device=png, dpi = 600, path = path_plots, bg = "transparent", width = 25, height = 15, units = "cm" )
+
 ```
 ### save
 ```{r}
@@ -1186,15 +1193,104 @@ merged_seurat_integrated <- readRDS("/home/data/Testa_organoids_scRNA/Seurat_cod
 
 
 # Downstream analyses on isoforms THRA1 and THRA2
-
+## adjust levels for graphs
 ```{r}
+## order the cell population in pseudotime
+new_order <- c("RG", "Proliferating RG", "NPCs-2","RG - enriched ribosomes", "OPCs-1", "oRG", "OPCs - Oligodendrocytes","RG - Astrocytes", "Astrocytes", "NPCs-1","OPCs-2", "Choroid Plexus cells", "Glial cells", "Neurons - ribosome enriched","NPCs-3",  "Immature Neurons", "Excitatory Neurons",   "Neurons-1",    "Neurons-2" )
+Idents(merged_seurat_integrated) <- factor(Idents(merged_seurat_integrated), levels= new_order)
+## order the timepoints
+merged_seurat_integrated$Timepoint <- factor(merged_seurat_integrated$Timepoint, levels = c("day_50", "day_100"))
+```
+
+## plot isoforms expression
+```{r}
+## do plots
 FeaturePlot(merged_seurat_integrated, features = c("THRA"))
 FeaturePlot(merged_seurat_integrated, features = c("THRA1"))
 FeaturePlot(merged_seurat_integrated, features = c("THRA2"))
-VlnPlot(merged_seurat_integrated, features = c("THRA1"))
-VlnPlot(merged_seurat_integrated, features = c("THRA2"))
 ```
 
+### raster plots
+```{r}
+RidgePlot(merged_seurat_integrated, features = c("VIM")) + NoLegend()+ 
+  theme(axis.title=element_blank(), axis.text.x = element_text(size = 10))
+```
+
+
+
+### Violin plots
+```{r}
+VlnPlot(merged_seurat_integrated, features = c("THRA1"), split.by = "Timepoint", split.plot = TRUE)
+VlnPlot(merged_seurat_integrated, features = c("THRA2"), split.by = "Timepoint", split.plot = TRUE, pt.size = 0) + 
+  theme(axis.title.x=element_blank(), axis.text.x = element_text(size = 10))
+
+
+
+VlnPlot(merged_seurat_integrated, features = c("THRA2"), pt.size = 0, split.by = "Timepoint", split.plot = T) + 
+  theme(axis.title.x=element_blank(), axis.text.x = element_text(size = 10)) + NoLegend() + ylim(0, 2)
+
+ggsave("Violin_THRA2_timepoints.png" , device=png, dpi = 600, path = path_plots, bg = "transparent", width = 25, height = 15, units = "cm" )
+```
+
+
+### DotPlots
+```{r}
+DotPlot(merged_seurat_integrated, features = c("THRA1", "THRA2"), dot.scale = 7.5) + 
+  theme(axis.title=element_blank())+ scale_colour_gradient(low =c("lightgrey"), high =c("red"))
+
+ggsave("THRA1_THRA2_dotplot.png" , device=png, dpi = 600, path = path_plots, bg = "transparent", width = 20, height = 15, units = "cm" ) 
+
+
+
+DotPlot(merged_seurat_integrated, features = c("THRA1", "THRA2", "SLC16A2"), dot.scale = 7.5) + 
+  theme(axis.title=element_blank()) + scale_colour_gradient(low =c("lightgrey"), high =c("red"))
+
+ggsave("THRA1_THRA2_MCT8_dotplot.png" , device=png, dpi = 600, path = path_plots, bg = "transparent", width = 20, height = 15, units = "cm" )
+
+
+
+DotPlot(merged_seurat_integrated, features = c("THRA1", "THRA2"), split.by = "Timepoint") + 
+  theme(axis.title.x=element_blank())
+```
+
+
+### FeaturePlots
+```{r}
+FeaturePlot(merged_seurat_integrated, features = c("THRA1", "THRA2"), blend = TRUE)
+
+FeaturePlot(merged_seurat_integrated, features = c("THRA1", "THRA2"), split.by = "Timepoint" )
+ggsave("UMAP_THRA1_THRA2_timepoints.png" , device=png, dpi = 600, path = path_plots, bg = "transparent", width = 25, height = 15, units = "cm" )
+
+
+FeaturePlot(merged_seurat_integrated, features = c("SLC16A2"), split.by = "Timepoint" )
+FeaturePlot(merged_seurat_integrated, features = c("SLC16A2"))
+```
+
+## Split dataset into timepoints to visualize the difference in expression in one graph
+```{r}
+# create a subsets
+day_50 <- subset(merged_seurat_integrated, subset = Timepoint == "day_50" )
+day_100 <- subset(merged_seurat_integrated, subset = Timepoint == "day_100" )
+```
+
+
+```{r}
+# plot (making sure that axis are comparable)
+
+DotPlot(day_50, features = c("THRA1", "THRA2"), dot.scale = 7.5, scale.max = 25, col.min = -1, col.max = 2.1) + 
+  theme(axis.title=element_blank()) + scale_colour_gradient(low =c("lightgrey"), high =c("red"))
+
+ggsave("THRA1_THRA2_dotplot_day_50.png" , device=png, dpi = 600, path = path_plots, bg = "transparent", width = 25, height = 15, units = "cm" )
+
+
+
+DotPlot(day_100, features = c("THRA1", "THRA2"), dot.scale = 7.5, scale.max = 25, col.min = -1, col.max = 2.1) + 
+  theme(axis.title=element_blank()) + scale_colour_gradient(low =c("lightgrey"), high =c("red"))
+
+ggsave("THRA1_THRA2_dotplot_day_100.png" , device=png, dpi = 600, path = path_plots, bg = "transparent", width = 25, height = 15, units = "cm" )
+
+
+```
 
 
 
