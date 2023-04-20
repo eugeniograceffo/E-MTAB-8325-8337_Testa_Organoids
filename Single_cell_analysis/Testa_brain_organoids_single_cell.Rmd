@@ -1105,8 +1105,9 @@ DimPlot(cluster_4_1,label.size = 4,repel = T,label = T) + NoLegend()
 ```
 
 ## Finally we can assign the names of the clusters
+### Subcluster 1 of cluster 4
 ```{r}
-## Assign names in the subsubclusters of cluster 1
+## Assign names in the subsubclusters of subcluster 1
 new.cluster.ids <- c("1", "Choroid Plexus cells", "1")
 names(new.cluster.ids) <- levels(cluster_4_1)
 cluster_4_1 <- RenameIdents(cluster_4_1, new.cluster.ids)
@@ -1134,6 +1135,69 @@ Idents(cluster_4) <- "integrated_snn_res.0.2"
 VlnPlot(cluster_4, features = c("TTR"))
 FeaturePlot(cluster_4, features = c("TTR"))
 ```
+
+```{r}
+## Assign names in the subsubclusters of subcluster 1
+new.cluster.ids <- c("OPCs-2", "oRG", "NPCs-1", "Choroid Plexus cells", "Astrocytes")
+names(new.cluster.ids) <- levels(cluster_4)
+cluster_4 <- RenameIdents(cluster_4, new.cluster.ids)
+DimPlot(cluster_4, reduction = "umap", label = TRUE, pt.size = 0.5) 
+```
+
+
+```{r}
+## project those identities back to cluster 4 of Seurat object
+
+# Get the indices of cells that are present in both the original Seurat object and the subseurat object
+indices <- match(rownames(cluster_4@meta.data), rownames(merged_seurat_integrated@meta.data))
+
+# Assign the subcluster identities to the corresponding cells in the original Seurat object
+merged_seurat_integrated$cluster_names <- as.character(Idents(merged_seurat_integrated))
+
+merged_seurat_integrated@meta.data$cluster_names[indices] <- as.character(Idents(cluster_4))
+
+
+# Visualize the subclusters in the original Seurat object
+DimPlot(merged_seurat_integrated, reduction = "umap", group.by = "cluster_names")
+DimPlot(merged_seurat_integrated, reduction = "umap")
+
+
+Idents(merged_seurat_integrated) <- "cluster_names"
+DimPlot(merged_seurat_integrated, reduction = "umap", label = TRUE, pt.size = 0.5) + NoLegend()
+
+```
+
+```{r}
+## Assign names of all remaining clusters
+new.cluster.ids <- c("Glial cells", "RG - enriched ribosomes", "OPCs-1", "OPCs-2", "Excitatory Neurons", "Proliferating RG", "RG", "Neurons-1", "RG - Astrocytes", "Immature Neurons", "oRG", "Neurons-2", "NPCs-1", "NPCs-3", "Choroid Plexus cells", "NPCs-2", "Neurons - ribosome enriched", "Astrocytes", "OPCs - Oligodendrocytes")
+names(new.cluster.ids) <- levels(merged_seurat_integrated)
+merged_seurat_integrated <- RenameIdents(merged_seurat_integrated, new.cluster.ids)
+merged_seurat_integrated$cluster_names_final <- as.character(Idents(merged_seurat_integrated))
+DimPlot(merged_seurat_integrated, reduction = "umap", label = TRUE, pt.size = 0.5) + NoLegend()
+```
+### save
+```{r}
+## Save the integrated Seurat object
+saveRDS(merged_seurat_integrated, "/home/data/Testa_organoids_scRNA/Seurat_code/outputs/merged_dataset_integrated_with_Seurat_SCT_Pearson_Ready_Markers_identified_clusters.rds")
+
+## load the integrated Seurat object
+merged_seurat_integrated <- readRDS("/home/data/Testa_organoids_scRNA/Seurat_code/outputs/merged_dataset_integrated_with_Seurat_SCT_Pearson_Ready_Markers_identified_clusters.rds")
+```
+
+
+# Downstream analyses on isoforms THRA1 and THRA2
+
+```{r}
+FeaturePlot(merged_seurat_integrated, features = c("THRA"))
+FeaturePlot(merged_seurat_integrated, features = c("THRA1"))
+FeaturePlot(merged_seurat_integrated, features = c("THRA2"))
+VlnPlot(merged_seurat_integrated, features = c("THRA1"))
+VlnPlot(merged_seurat_integrated, features = c("THRA2"))
+```
+
+
+
+
 
 
 
