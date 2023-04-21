@@ -1291,6 +1291,34 @@ ggsave("THRA1_THRA2_dotplot_day_100.png" , device=png, dpi = 600, path = path_pl
 
 
 ```
+## Visualize the proportions of each cell population between conditions
+```{r}
+# How does cluster membership vary by replicate?
+table(Idents(merged_seurat_integrated), merged_seurat_integrated$Timepoint)
+
+cell_composition <- as.data.frame(prop.table(table(Idents(merged_seurat_integrated), merged_seurat_integrated$Timepoint), margin = 2)) %>%
+  mutate(Freq = round((Freq * 100), digits = 2)) %>%
+  mutate(Freq_adjusted = ifelse(Var2 == "day_50", Freq *-1,Freq))
+
+cell_composition
+
+ggplot(cell_composition, aes(x=Var1, y=Freq_adjusted, label=Var2)) + 
+  geom_bar(stat='identity',position = "stack", aes(fill=Var2), width=.5)  +
+   theme_light(base_size = 12)+
+  scale_fill_manual(name="", 
+                    labels = c( "day_50", "day_100"), 
+                    values = c("day_50"="#5A7C86", "day_100"="#A2D2DB")) + 
+  scale_y_continuous("% of cells" ,limits=c(-20, 20))+ 
+#  geom_hline(yintercept=50, linetype="dashed", color = "#DC4E3C")+
+  #labs(subtitle="", 
+      # title= "THRA isoform expression pattern - Mosdepth",
+       #caption = "~62M uniquely mapped reads, n=1") + 
+    theme(axis.title.y=element_blank()) +
+  coord_flip()
+
+ggsave("Cell_population_distribution_timepoints.png" , device=png, dpi = 600, path = path_plots, bg = "transparent", width = 25, height = 15, units = "cm" )
+
+```
 
 
 
