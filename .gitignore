@@ -13,3 +13,4 @@ Single_cell_analysis/genome_files/THRA_Reference_GTF_filtered_exons_9_10_only.nu
 Single_cell_analysis/genome_files/THRA_reference_modified.txt
 Single_cell_analysis/Testa_brain_organoids_single_cell.nb.html
 Single_cell_analysis/figures/THRA1_THRA2_dotplot_merged.pptx
+*.txt
